@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AeroPredict AI — Flight Delay Prediction System using XGBoost, SHAP Explainability, and Deep Neural Networks achieving 95%+ accuracy.">
+    <title>AeroPredict AI | Flight Delay Prediction System</title>
+    <meta name="author" content="Flight Prediction Research Lab">
+    <meta name="keywords" content="flight delay prediction, machine learning, XGBoost, SHAP, explainable AI">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <div class="glow-bg"></div>
+
+    <!-- ═══ Navigation ═══ -->
+    <nav class="glass-nav">
+        <div class="nav-container">
+            <div class="brand">
+                <i class="fas fa-plane-departure pulse-icon"></i>
+                <span>AeroPredict <span class="accent">AI</span></span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#predict" class="active">Predict</a></li>
+                <li><a href="#performance">Model Results</a></li>
+                <li><a href="#charts">Analytics</a></li>
+            </ul>
+            <div class="system-status">
+                <span class="status-dot"></span> XGBoost Engine Online
+            </div>
+        </div>
+    </nav>
+
+    <!-- ═══ Hero ═══ -->
+    <section class="hero-section">
+        <h1>Flight Delay Prediction System</h1>
+        <p class="subtitle">Explainable AI-powered analysis using XGBoost with SHAP interpretability — achieving 95.56% prediction accuracy across 6 models</p>
+    </section>
+
+    <!-- ═══ Stats Bar ═══ -->
+    <div class="stats-bar">
+        <div class="stat-chip animate-in delay-1">
+            <div class="stat-icon blue"><i class="fas fa-bullseye"></i></div>
+            <div>
+                <div class="stat-value">95.56%</div>
+                <div class="stat-label">XGBoost Accuracy</div>
+            </div>
+        </div>
+        <div class="stat-chip animate-in delay-2">
+            <div class="stat-icon green"><i class="fas fa-brain"></i></div>
+            <div>
+                <div class="stat-value">98.42%</div>
+                <div class="stat-label">Neural Net Accuracy</div>
+            </div>
+        </div>
+        <div class="stat-chip animate-in delay-3">
+            <div class="stat-icon pink"><i class="fas fa-layer-group"></i></div>
+            <div>
+                <div class="stat-value">6</div>
+                <div class="stat-label">Models Compared</div>
+            </div>
+        </div>
+        <div class="stat-chip animate-in delay-4">
+            <div class="stat-icon yellow"><i class="fas fa-database"></i></div>
+            <div>
+                <div class="stat-value">100K</div>
+                <div class="stat-label">Training Samples</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Main Dashboard ═══ -->
+    <main class="dashboard-grid" id="predict">
+
+        <!-- ── Input Panel ── -->
+        <section class="control-panel glass-card">
+            <h2 class="section-title"><i class="fas fa-sliders-h"></i> Flight Parameters</h2>
+            <form id="predictionForm">
+                <div class="tabs">
+                    <button type="button" class="tab-btn active" data-tab="flight"><i class="fas fa-plane"></i> Flight</button>
+                    <button type="button" class="tab-btn" data-tab="weather"><i class="fas fa-cloud-sun"></i> Weather</button>
+                    <button type="button" class="tab-btn" data-tab="ops"><i class="fas fa-cogs"></i> Operations</button>
+                </div>
+
+                <!-- Flight Tab -->
+                <div class="tab-content" id="flightTab">
+                    <div class="form-row">
+                        <div class="input-box">
+                            <label>Airline Carrier</label>
+                            <select name="airline" id="airline-select">
+                                {% for airline in airlines %}
+                                <option value="{{ airline.IATA_CODE }}">{{ airline.IATA_CODE }} — {{ airline.AIRLINE }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row two-col">
+                        <div class="input-box">
+                            <label>Flight Date</label>
+                            <input type="date" name="date" id="flight-date" value="2026-04-15">
+                        </div>
+                        <div class="input-box">
+                            <label>Departure Time</label>
+                            <input type="time" name="time" id="flight-time" value="14:30">
+                        </div>
+                    </div>
+                    <div class="form-row two-col">
+                        <div class="input-box">
+                            <label>Origin Airport</label>
+                            <select name="origin" id="origin-select">
+                                {% for airport in airports[:50] %}
+                                <option value="{{ airport.IATA_CODE }}" {% if airport.IATA_CODE == 'JFK' %}selected{% endif %}>{{ airport.IATA_CODE }} — {{ airport.AIRPORT[:35] }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="input-box">
+                            <label>Destination Airport</label>
+                            <select name="dest" id="dest-select">
+                                {% for airport in airports[:50] %}
+                                <option value="{{ airport.IATA_CODE }}" {% if airport.IATA_CODE == 'LAX' %}selected{% endif %}>{{ airport.IATA_CODE }} — {{ airport.AIRPORT[:35] }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="input-box">
+                            <label>Distance (Miles)</label>
+                            <div class="range-row">
+                                <input type="range" name="distance" min="50" max="5000" value="1200" class="range-slider" id="distance-slider">
+                                <span class="range-val" id="distance-val">1200 mi</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Weather Tab -->
+                <div class="tab-content hidden" id="weatherTab">
+                    <div class="form-row two-col">
+                        <div class="input-box">
+                            <label>Temperature (°C)</label>
+                            <div class="range-row">
+                                <input type="range" name="temp" min="-20" max="50" value="22" class="range-slider" id="temp-slider">
+                                <span class="range-val" id="temp-val">22°C</span>
+                            </div>
+                        </div>
+                        <div class="input-box">
+                            <label>Wind Speed (km/h)</label>
+                            <div class="range-row">
+                                <input type="range" name="wind" min="0" max="120" value="15" class="range-slider" id="wind-slider">
+                                <span class="range-val" id="wind-val">15 km/h</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row two-col">
+                        <div class="input-box">
+                            <label>Precipitation (mm)</label>
+                            <input type="number" name="precip" id="precip-input" value="0" step="0.5" min="0" max="100">
+                        </div>
+                        <div class="input-box">
+                            <label>Visibility (km)</label>
+                            <div class="range-row">
+                                <input type="range" name="vis" min="0.5" max="20" value="10" step="0.5" class="range-slider" id="vis-slider">
+                                <span class="range-val" id="vis-val">10 km</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row two-col">
+                        <div class="input-box">
+                            <label>Humidity (%)</label>
+                            <div class="range-row">
+                                <input type="range" name="hum" min="10" max="100" value="50" class="range-slider" id="hum-slider">
+                                <span class="range-val" id="hum-val">50%</span>
+                            </div>
+                        </div>
+                        <div class="input-box">
+                            <label>Pressure (hPa)</label>
+                            <input type="number" name="pres" id="pres-input" value="1013" step="1" min="960" max="1060">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Operations Tab -->
+                <div class="tab-content hidden" id="opsTab">
+                    <div class="form-row two-col">
+                        <div class="input-box">
+                            <label>Airport Congestion</label>
+                            <div class="range-row">
+                                <input type="range" name="congestion" min="0" max="1" step="0.05" value="0.50" class="range-slider" id="congestion-slider">
+                                <span class="range-val" id="congestion-val">0.50</span>
+                            </div>
+                        </div>
+                        <div class="input-box">
+                            <label>Passenger Load Factor</label>
+                            <div class="range-row">
+                                <input type="range" name="load" min="0.3" max="1" step="0.05" value="0.80" class="range-slider" id="load-slider">
+                                <span class="range-val" id="load-val">80%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row two-col">
+                        <div class="input-box">
+                            <label>Aircraft Age (Years)</label>
+                            <input type="number" name="age" id="age-input" value="8" min="0" max="40">
+                        </div>
+                        <div class="input-box">
+                            <label>Connections</label>
+                            <select name="conns" id="conns-select">
+                                <option value="0" selected>Direct (0 stops)</option>
+                                <option value="1">1 Connection</option>
+                                <option value="2">2 Connections</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row two-col">
+                        <div class="input-box">
+                            <label>Fuel Weight (kg)</label>
+                            <input type="number" name="fuel" id="fuel-input" value="20000" step="500" min="5000" max="50000">
+                        </div>
+                        <div class="input-box">
+                            <label>Cargo Weight (kg)</label>
+                            <input type="number" name="cargo" id="cargo-input" value="5000" step="500" min="0" max="20000">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="input-box">
+                            <label>Ground Crew Efficiency</label>
+                            <div class="range-row">
+                                <input type="range" name="efficiency" min="0" max="1" step="0.05" value="0.90" class="range-slider" id="efficiency-slider">
+                                <span class="range-val" id="efficiency-val">90%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="neon-btn" id="predictBtn">
+                    <i class="fas fa-rocket"></i>&nbsp; EXECUTE PREDICTION
+                </button>
+            </form>
+        </section>
+
+        <!-- ── Results Panel ── -->
+        <section class="analytics-panel">
+            <!-- Loading -->
+            <div id="loading" class="hidden">
+                <div class="scanner"></div>
+                <p>Analyzing Flight Parameters...</p>
+            </div>
+
+            <!-- Prediction Result -->
+            <div id="result" class="hidden">
+                <div class="risk-gauge-container glass-card animate-in">
+                    <div class="gauge-header">
+                        <h3><i class="fas fa-shield-halved"></i>&nbsp; DELAY RISK ASSESSMENT</h3>
+                        <span id="riskLevel" class="risk-tag low">LOW</span>
+                    </div>
+                    <div class="big-percent" id="probText">0.0%</div>
+                    <div class="progress-container">
+                        <div id="probFill" class="progress-fill"></div>
+                    </div>
+                    <div class="status-msg on-time" id="predictionText">ON TIME</div>
+                </div>
+
+                <!-- XAI Explanation -->
+                <div class="xai-container glass-card animate-in delay-2">
+                    <h3><i class="fas fa-brain"></i> SHAP EXPLANATION — WHY THIS PREDICTION?</h3>
+                    <div id="xaiList" class="xai-list"></div>
+                </div>
+            </div>
+
+            <!-- Default Info Card -->
+            <div class="info-card glass-card" id="infoCard">
+                <h3><i class="fas fa-circle-info"></i> HOW IT WORKS</h3>
+                <p>This system uses <strong style="color: var(--accent);">XGBoost</strong> trained on flight and weather features to predict delay probability. Results are explained through <strong style="color: var(--neon-purple);">SHAP (Shapley Additive Explanations)</strong> to ensure transparent, interpretable AI decisions. Configure flight parameters on the left and click <em>Execute Prediction</em> to analyze.</p>
+                <div style="margin-top: 1.25rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                    <span style="background: var(--accent-dim); color: var(--accent); padding: 5px 14px; border-radius: 6px; font-size: 0.75rem; font-weight: 600;">25 Input Features</span>
+                    <span style="background: var(--neon-green-dim); color: var(--neon-green); padding: 5px 14px; border-radius: 6px; font-size: 0.75rem; font-weight: 600;">SHAP Explainability</span>
+                    <span style="background: var(--neon-pink-dim); color: var(--neon-pink); padding: 5px 14px; border-radius: 6px; font-size: 0.75rem; font-weight: 600;">Real-Time Inference</span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ═══ Model Performance Dashboard ═══ -->
+    <section class="performance-section" id="performance">
+        <div class="perf-header">
+            <h2><i class="fas fa-chart-line"></i> Model Performance Dashboard</h2>
+        </div>
+
+        <div class="model-cards-grid" id="modelCardsGrid">
+            <!-- Cards injected by JS -->
+        </div>
+
+        <!-- Results Table -->
+        <div class="glass-card" style="margin-top: 1.5rem;">
+            <h3 style="font-family: 'Orbitron', sans-serif; font-size: 0.85rem; color: var(--text-secondary); letter-spacing: 1px; margin-bottom: 1.25rem;">
+                <i class="fas fa-table" style="color: var(--accent);"></i>&nbsp; COMPREHENSIVE METRICS
+            </h3>
+            <div class="results-table-container">
+                <table class="results-table" id="resultsTable">
+                    <thead>
+                        <tr>
+                            <th>Model</th>
+                            <th>Accuracy</th>
+                            <th>Precision</th>
+                            <th>Recall</th>
+                            <th>F1-Score</th>
+                            <th>AUC-ROC</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsBody">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ Charts Section ═══ -->
+    <section class="performance-section" id="charts">
+        <div class="glass-card chart-viewer">
+            <h3 style="font-family: 'Orbitron', sans-serif; font-size: 0.85rem; color: var(--text-secondary); letter-spacing: 1px; margin-bottom: 1.25rem;">
+                <i class="fas fa-chart-area" style="color: var(--accent);"></i>&nbsp; EVALUATION CHARTS
+            </h3>
+            <div class="chart-tabs" id="chartTabs">
+                <!-- Tabs injected by JS -->
+            </div>
+            <div class="chart-display" id="chartDisplay">
+                <div class="chart-placeholder">
+                    <i class="fas fa-chart-pie"></i>
+                    <p>Select a chart from the tabs above</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ Prediction History ═══ -->
+    <section class="performance-section" id="history">
+        <div class="perf-header">
+            <h2><i class="fas fa-history"></i> Prediction History</h2>
+            <button class="btn-secondary" id="clearHistoryBtn"><i class="fas fa-trash"></i> Clear</button>
+        </div>
+        <div class="glass-card">
+            <div id="historyList" class="history-list">
+                <p style="color: var(--text-secondary);">No predictions yet</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ Export & Tools ═══ -->
+    <section class="performance-section" id="tools">
+        <div class="perf-header">
+            <h2><i class="fas fa-toolbox"></i> Tools & Features</h2>
+        </div>
+        <div class="tool-cards-grid">
+            <div class="tool-card glass-card animate-in">
+                <div class="tool-icon"><i class="fas fa-download"></i></div>
+                <h4>Export Report</h4>
+                <p>Download prediction results and SHAP explanations as CSV</p>
+                <button class="btn-primary" id="exportBtn">Export CSV</button>
+            </div>
+            <div class="tool-card glass-card animate-in delay-1">
+                <div class="tool-icon"><i class="fas fa-book"></i></div>
+                <h4>API Documentation</h4>
+                <p>Integrate AeroPredict AI with your applications via REST API</p>
+                <button class="btn-primary" onclick="showApiDocs()">View API Docs</button>
+            </div>
+            <div class="tool-card glass-card animate-in delay-2">
+                <div class="tool-icon"><i class="fas fa-palette"></i></div>
+                <h4>Dark/Light Mode</h4>
+                <p>Toggle between dark and light themes for comfortable usage</p>
+                <button class="btn-primary" id="modeToggle"><i class="fas fa-moon"></i> Dark</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ Footer ═══ -->
+    <footer class="site-footer">
+        <div class="footer-grid">
+            <div>
+                <div class="footer-brand"><i class="fas fa-plane-departure" style="color: var(--accent);"></i> AeroPredict <span style="color: var(--accent);">AI</span></div>
+                <p class="footer-desc">An explainable AI system for flight delay prediction using enterprise-grade ensemble machine learning. SHAP-driven interpretability for transparent decision-making.</p>
+                <div style="margin-top: 1rem; display: flex; gap: 0.75rem;">
+                    <span class="badge">Python 3.11</span>
+                    <span class="badge">XGBoost</span>
+                    <span class="badge">SHAP</span>
+                    <span class="badge">Flask</span>
+                </div>
+            </div>
+            <div>
+                <div class="footer-title">Models Ensemble</div>
+                <ul class="footer-list">
+                    <li><i class="fas fa-check"></i> XGBoost (95.56%)</li>
+                    <li><i class="fas fa-check"></i> LightGBM (95.36%)</li>
+                    <li><i class="fas fa-check"></i> Random Forest (94.49%)</li>
+                    <li><i class="fas fa-check"></i> Neural Network (98.51%)</li>
+                    <li><i class="fas fa-check"></i> Voting Ensemble</li>
+                    <li><i class="fas fa-check"></i> Stacking Classifier</li>
+                </ul>
+            </div>
+            <div>
+                <div class="footer-title">Key Features</div>
+                <ul class="footer-list">
+                    <li><i class="fas fa-circle"></i> Real-time Predictions</li>
+                    <li><i class="fas fa-circle"></i> SHAP Explainability</li>
+                    <li><i class="fas fa-circle"></i> 25 Input Features</li>
+                    <li><i class="fas fa-circle"></i> Risk Assessment</li>
+                    <li><i class="fas fa-circle"></i> Prediction History</li>
+                    <li><i class="fas fa-circle"></i> Export Reports</li>
+                </ul>
+            </div>
+            <div>
+                <div class="footer-title">Technologies</div>
+                <ul class="footer-list">
+                    <li><i class="fas fa-square"></i> scikit-learn</li>
+                    <li><i class="fas fa-square"></i> TensorFlow/Keras</li>
+                    <li><i class="fas fa-square"></i> Pandas/NumPy</li>
+                    <li><i class="fas fa-square"></i> Matplotlib</li>
+                    <li><i class="fas fa-square"></i> Flask/Jinja2</li>
+                    <li><i class="fas fa-square"></i> JavaScript ES6+</li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-divider"></div>
+        <div class="footer-copyright">
+            <p>&copy; 2026 AeroPredict AI — Advanced Flight Delay Prediction Research System</p>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                Built for predictive analytics, explainability, and aviation intelligence
+            </p>
+        </div>
+    </footer>
+
+    <!-- ═══ Modal: API Documentation ═══ -->
+    <div id="apiModal" class="modal hidden">
+        <div class="modal-content glass-card">
+            <div class="modal-header">
+                <h2><i class="fas fa-book"></i> REST API Documentation</h2>
+                <button class="modal-close" onclick="closeApiDocs()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h3><i class="fas fa-code"></i> Base URL</h3>
+                <pre>http://localhost:5000</pre>
+
+                <h3><i class="fas fa-microchip"></i> Endpoints</h3>
+
+                <h4>POST /predict</h4>
+                <p>Make a flight delay prediction with form data.</p>
+                <pre><code>curl -X POST http://localhost:5000/predict \
+  -d "date=2026-04-15&time=14:30&airline=UA&origin=JFK&dest=LAX&distance=2500&temp=22&wind=15&precip=0&vis=10&hum=50&pres=1013"</code></pre>
+
+                <h4>GET /api/results</h4>
+                <p>Retrieve all model evaluation metrics.</p>
+                <pre><code>curl http://localhost:5000/api/results</code></pre>
+
+                <h4>GET /api/charts</h4>
+                <p>List available visualization charts.</p>
+                <pre><code>curl http://localhost:5000/api/charts</code></pre>
+
+                <h4>GET /api/charts/{filename}</h4>
+                <p>Download specific chart image.</p>
+                <pre><code>curl http://localhost:5000/api/charts/model_comparison.png</code></pre>
+
+                <h3><i class="fas fa-check-circle"></i> Response Format</h3>
+                <pre><code>{
+  "success": true,
+  "prediction": "ON TIME",
+  "probability": 0.3234,
+  "risk_level": "LOW",
+  "explanations": [
+    {
+      "feature": "Precipitation mm",
+      "impact": "decreased",
+      "importance": 0.1523,
+      "value": 0.0
+    }
+  ]
+}</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ JavaScript ═══ -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+    function showApiDocs() {
+        document.getElementById('apiModal').classList.remove('hidden');
+    }
+
+    function closeApiDocs() {
+        document.getElementById('apiModal').classList.add('hidden');
+    }
+
+    // Close modal on escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeApiDocs();
+    });
+    </script>
+</body>
+</html>
+
+    <!-- ═══ JavaScript ═══ -->
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // ── Tab Logic ──
+        const tabs = document.querySelectorAll('.tab-btn');
+        tabs.forEach(tab => {
+            tab.onclick = () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+                document.getElementById(`${tab.dataset.tab}Tab`).classList.remove('hidden');
+            };
+        });
+
+        // ── Range Sliders ──
+        const sliderConfigs = {
+            'distance': { suffix: ' mi', el: 'distance-val' },
+            'temp':     { suffix: '°C', el: 'temp-val' },
+            'wind':     { suffix: ' km/h', el: 'wind-val' },
+            'vis':      { suffix: ' km', el: 'vis-val' },
+            'hum':      { suffix: '%', el: 'hum-val' },
+            'congestion': { suffix: '', el: 'congestion-val' },
+            'load':     { suffix: '%', el: 'load-val', multiply: 100, round: 0 },
+            'efficiency': { suffix: '%', el: 'efficiency-val', multiply: 100, round: 0 },
+        };
+
+        document.querySelectorAll('.range-slider').forEach(slider => {
+            const cfg = sliderConfigs[slider.name];
+            if (!cfg) return;
+
+            const update = () => {
+                let val = parseFloat(slider.value);
+                if (cfg.multiply) val = val * cfg.multiply;
+                if (cfg.round !== undefined) val = Math.round(val);
+                document.getElementById(cfg.el).textContent = val + cfg.suffix;
+            };
+
+            slider.addEventListener('input', update);
+            update(); // init
+        });
+
+        // ── Smooth scroll nav ──
+        document.querySelectorAll('.nav-links a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = document.querySelector(link.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+                link.classList.add('active');
+            });
+        });
+
+        // ── Prediction Form ──
+        document.getElementById('predictionForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const loadingEl = document.getElementById('loading');
+            const resultEl = document.getElementById('result');
+            const infoCard = document.getElementById('infoCard');
+
+            loadingEl.classList.remove('hidden');
+            resultEl.classList.add('hidden');
+            infoCard.classList.add('hidden');
+
+            try {
+                const response = await fetch('/predict', { method: 'POST', body: formData });
+                const result = await response.json();
+
+                loadingEl.classList.add('hidden');
+
+                if (result.success) {
+                    resultEl.classList.remove('hidden');
+
+                    const prob = (result.probability * 100);
+                    const probText = document.getElementById('probText');
+                    const predictionText = document.getElementById('predictionText');
+                    const riskLevel = document.getElementById('riskLevel');
+                    const fill = document.getElementById('probFill');
+
+                    // Animate counter
+                    animateCounter(probText, 0, prob, 1200);
+
+                    predictionText.textContent = result.prediction;
+                    predictionText.className = 'status-msg ' + (result.prediction === 'ON TIME' ? 'on-time' : 'delayed');
+
+                    riskLevel.textContent = result.risk_level;
+                    riskLevel.className = 'risk-tag ' + result.risk_level.toLowerCase();
+
+                    // Color scheme based on risk
+                    let color;
+                    if (prob > 80) color = '#ff2d75';
+                    else if (prob > 50) color = '#ff7800';
+                    else if (prob > 30) color = '#ffb800';
+                    else color = '#00ff88';
+
+                    fill.style.width = prob + '%';
+                    fill.style.background = `linear-gradient(90deg, ${color}88, ${color})`;
+                    probText.style.color = color;
+
+                    // XAI explanations
+                    const xaiList = document.getElementById('xaiList');
+                    xaiList.innerHTML = '';
+                    result.explanations.forEach((item, idx) => {
+                        const div = document.createElement('div');
+                        div.className = `xai-item ${item.impact === 'increased' ? 'risk-up' : 'risk-down'} animate-in`;
+                        div.style.animationDelay = `${idx * 0.1}s`;
+                        const barWidth = Math.min(item.importance * 80, 100);
+                        div.innerHTML = `
+                            <div class="xai-info">
+                                <div>
+                                    <span class="xai-feat">${item.feature}</span>
+                                    <span class="xai-value">&nbsp; = ${item.value}</span>
+                                </div>
+                                <span class="xai-impact ${item.impact}">${item.impact === 'increased' ? '↑ RISK UP' : '↓ RISK DOWN'}</span>
+                            </div>
+                            <div class="xai-bar-bg"><div class="xai-bar-fill" style="width: ${barWidth}%; background: ${item.impact === 'increased' ? '#ff2d75' : '#00ff88'}"></div></div>
+                        `;
+                        xaiList.appendChild(div);
+                    });
+
+                } else {
+                    infoCard.classList.remove('hidden');
+                    alert('Prediction error: ' + result.error);
+                }
+            } catch (err) {
+                loadingEl.classList.add('hidden');
+                infoCard.classList.remove('hidden');
+                alert('Network error: ' + err.message);
+            }
+        };
+
+        // ── Counter Animation ──
+        function animateCounter(el, start, end, duration) {
+            const startTime = performance.now();
+            function update(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                const current = start + (end - start) * eased;
+                el.textContent = current.toFixed(1) + '%';
+                if (progress < 1) requestAnimationFrame(update);
+            }
+            requestAnimationFrame(update);
+        }
+
+        // ── Load Model Results ──
+        async function loadModelResults() {
+            try {
+                const res = await fetch('/api/results');
+                const data = await res.json();
+                if (!data.success) return;
+
+                const results = data.results;
+                const grid = document.getElementById('modelCardsGrid');
+                const tbody = document.getElementById('resultsBody');
+
+                // Find best model by accuracy
+                const bestAcc = Math.max(...results.map(r => r.Accuracy));
+
+                // Model cards
+                grid.innerHTML = '';
+                results.forEach((r, idx) => {
+                    const isBest = r.Accuracy === bestAcc;
+                    const accPercent = (r.Accuracy * 100).toFixed(2);
+                    const card = document.createElement('div');
+                    card.className = `model-card animate-in ${isBest ? 'best' : ''}`;
+                    card.style.animationDelay = `${idx * 0.1}s`;
+                    card.innerHTML = `
+                        <div class="model-name">${r.Model}</div>
+                        <div class="model-accuracy ${isBest ? 'green' : 'blue'}">${accPercent}%</div>
+                        <div class="model-metrics">
+                            <div class="metric">Prec: <span>${(r.Precision * 100).toFixed(1)}%</span></div>
+                            <div class="metric">Recall: <span>${(r.Recall * 100).toFixed(1)}%</span></div>
+                            <div class="metric">F1: <span>${(r['F1-Score'] * 100).toFixed(1)}%</span></div>
+                            <div class="metric">AUC: <span>${(r['AUC-ROC'] * 100).toFixed(1)}%</span></div>
+                        </div>
+                        <div class="mini-bar-container">
+                            <div class="mini-bar-fill ${isBest ? 'green' : ''}" style="width: ${accPercent}%"></div>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+
+                // Results table
+                tbody.innerHTML = '';
+                results.forEach(r => {
+                    const isBest = r.Accuracy === bestAcc;
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${r.Model} ${isBest ? '🏆' : ''}</td>
+                        <td class="${isBest ? 'highlight-cell' : ''}">${(r.Accuracy * 100).toFixed(2)}%</td>
+                        <td>${(r.Precision * 100).toFixed(2)}%</td>
+                        <td>${(r.Recall * 100).toFixed(2)}%</td>
+                        <td>${(r['F1-Score'] * 100).toFixed(2)}%</td>
+                        <td>${(r['AUC-ROC'] * 100).toFixed(2)}%</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+            } catch (e) {
+                console.warn('Could not load model results:', e);
+            }
+        }
+
+        // ── Load Charts ──
+        async function loadCharts() {
+            try {
+                const res = await fetch('/api/charts');
+                const data = await res.json();
+                if (!data.success || !data.charts.length) return;
+
+                const tabContainer = document.getElementById('chartTabs');
+                const chartDisplay = document.getElementById('chartDisplay');
+
+                const chartLabels = {
+                    'model_comparison.png': 'Model Comparison',
+                    'confusion_matrices.png': 'Confusion Matrices',
+                    'roc_curves.png': 'ROC Curves',
+                    'precision_recall_curves.png': 'Precision-Recall',
+                    'feature_importance_comparison.png': 'Feature Importance',
+                    'model_performance_radar.png': 'Radar Chart',
+                    'cross_validation_analysis.png': 'Cross Validation',
+                    'learning_curves.png': 'Learning Curves',
+                    'calibration_curves.png': 'Calibration Curves',
+                    'cumulative_gain_chart.png': 'Cumulative Gain',
+                    'lift_chart.png': 'Lift Chart',
+                };
+
+                tabContainer.innerHTML = '';
+                data.charts.forEach((chart, idx) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'chart-tab' + (idx === 0 ? ' active' : '');
+                    btn.textContent = chartLabels[chart] || chart.replace('.png', '').replace(/_/g, ' ');
+                    btn.onclick = () => showChart(chart, btn);
+                    tabContainer.appendChild(btn);
+                });
+
+                // Show first chart
+                if (data.charts.length > 0) showChart(data.charts[0], tabContainer.firstChild);
+
+                function showChart(filename, activeBtn) {
+                    document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+                    activeBtn.classList.add('active');
+                    chartDisplay.innerHTML = `<img src="/api/charts/${filename}" alt="${filename}" onload="this.classList.add('loaded')">`;
+                }
+
+            } catch (e) {
+                console.warn('Could not load charts:', e);
+            }
+        }
+
+        // ── Initialize ──
+        loadModelResults();
+        loadCharts();
+    });
+    </script>
+</body>
+</html>

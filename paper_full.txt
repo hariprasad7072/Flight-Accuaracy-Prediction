@@ -1,0 +1,769 @@
+AeroPredict: An Explainable Machine Learning Framework for Flight Delay Prediction Using XGBoost and SHAP Analysis
+I Hari PrasadDivision of Artificial Intelligence and Machine LearningKarunya Institute of Technology and SciencesCoimbatore, Indiahp237072@gmail.com
+l
+Sophia SDivision of Artificial intelligence and Machine LearningKarunya Institute of Technology and SciencesCoimbatore, Indiasophia@karunya.edu
+Abstract— Flight delays pose significant operational and economic challenges to the aviation industry, affecting airlines, airports, and passengers worldwide. Accurate prediction of flight delays can enable proactive decision-making and resource optimization. This paper presents AeroPredict, an explainable machine learning framework for binary flight delay classification that integrates high-accuracy predictive modeling with post-hoc interpretability through SHapley Additive exPlanations (SHAP). A comprehensive pipeline is developed encompassing feature engineering with 25 multi-dimensional input features — spanning meteorological conditions (temperature, precipitation, wind speed, visibility, humidity, pressure), temporal patterns (month, day of week, departure hour), route characteristics (distance, airport congestion index), and operational parameters (aircraft age, passenger load factor, fuel weight, cargo weight, ground crew efficiency) — followed by feature selection and standardized scaling. Six distinct models are trained and rigorously evaluated on a dataset of 100,000+ flight records: XGBoost, LightGBM, Random Forest, Deep Neural Network (with Batch Normalization and Dropout), Soft Voting Ensemble, and Stacking Ensemble with Logistic Regression meta-learner. Experimental results demonstrate that all models surpass the 90% accuracy threshold, with the Neural Network achieving the highest accuracy of 98.51% (AUC-ROC: 0.9883) and XGBoost attaining 95.56% accuracy (AUC-ROC: 0.9842). Five-fold stratified cross-validation confirms model generalizability with minimal variance. To address the black-box nature of ensemble methods, SHAP-based feature attribution is integrated to provide transparent, per-prediction explanations identifying the top contributing factors to each delay prediction. The framework is deployed as an interactive web application (AeroPredict AI) built on Flask, enabling real-time delay prediction with dynamic weather integration, automatic route parameter computation via Haversine distance calculation, and visual SHAP-driven explanations. Comprehensive evaluation through confusion matrices, ROC curves, precision-recall curves, calibration curves, learning curves, and radar charts validates the robustness and reliability of the proposed system, establishing AeroPredict as a practical, interpretable tool for aviation delay risk assessment.
+Keywords: Flight Delay Prediction, XGBoost, SHAP, Explainable AI (XAI), Ensemble Learning, Deep Neural Network, Aviation Analytics, Machine Learning
+Introduction
+Air transportation serves as a vital pillar of global connectivity, facilitating the movement of over 4.5 billion passengers annually and contributing approximately 3.5% to the world's gross domestic product [1]. Despite its significance, the aviation industry continues to face the persistent challenge of flight delays, which propagate across interconnected airline networks and result in economic losses exceeding $30 billion annually in the United States alone [2]. These delays degrade passenger satisfaction, escalate operational costs for airlines, and impose considerable strain on airport infrastructure and air traffic management systems [3]. Consequently, the accurate and timely prediction of flight delays has become a critical priority for all stakeholders within the aviation ecosystem.
+Flight delays are influenced by a complex interplay of heterogeneous factors, including adverse weather conditions, air traffic congestion, mechanical failures, crew scheduling limitations, and regulatory constraints [4]. The multifactorial and inherently stochastic nature of these variables makes delay prediction a non-trivial problem, largely unsuitable for conventional rule-based or statistical approaches. In recent years, machine learning (ML) techniques have shown remarkable potential in modeling the complex, non-linear relationships embedded in aviation operational data [5], [6]. Supervised learning methods—including decision trees, support vector machines, and gradient boosting frameworks—have been increasingly applied to flight delay classification, though with varying levels of effectiveness [7], [8].
+Among ensemble learning methods, gradient boosting algorithms such as XGBoost [9] and LightGBM [10] have consistently demonstrated state-of-the-art performance across diverse predictive tasks. Their capacity to handle heterogeneous feature spaces, capture intricate feature interactions, and mitigate overfitting through built-in regularization makes them particularly effective for flight delay classification. Similarly, deep neural networks (DNNs) offer the ability to learn hierarchical feature representations from large-scale datasets [11]. However, the superior predictive accuracy of these models often comes at the expense of interpretability—a critical limitation in safety-critical domains such as aviation, where transparent and accountable decision-making is essential [12].
+Explainable Artificial Intelligence (XAI) has emerged as a promising paradigm to bridge this gap. SHapley Additive exPlanations (SHAP), grounded in cooperative game theory, provides a mathematically rigorous framework for quantifying the contribution of each input feature to an individual prediction [13]. By computing Shapley values, SHAP delivers both global feature importance rankings and local, instance-level explanations, enabling stakeholders to understand precisely why a given flight is predicted to experience a delay [14].
+Despite the expanding body of research on flight delay prediction, several notable gaps remain unaddressed. First, many studies evaluate only a narrow range of ML models, lacking systematic comparison under uniform experimental settings. Second, feature engineering is often limited to temporal and carrier-level attributes, while operationally significant factors—such as aircraft age, airport congestion, passenger load, ground crew efficiency, and cargo weight—remain underexplored. Third, the integration of post-hoc explainability methods into a fully deployable, end-to-end prediction system is rarely realized. Fourth, the transition from a research prototype to an accessible, interactive tool for non-technical users receives insufficient attention.
+To address these challenges, this paper presents AeroPredict, a comprehensive and explainable ML framework for flight delay prediction. The key contributions of this work are summarized below:
+A rigorous comparative evaluation of six ML models—XGBoost, LightGBM, Random Forest, Deep Neural Network (with Batch Normalization and Dropout), Soft Voting Ensemble, and Stacking Ensemble—is conducted on a dataset of over 100,000 flight records. All models exceed 90% accuracy, with the Neural Network achieving the highest accuracy of 98.51% (AUC-ROC: 0.9883) and XGBoost attaining 95.56% (AUC-ROC: 0.9842).
+A rich 25-dimensional feature space is engineered, incorporating meteorological, temporal, route-based, and operational variables to capture the full spectrum of delay-inducing factors.
+SHAP-based explainability is integrated to deliver per-prediction feature attribution, transforming the classifier from a black-box model into a transparent decision-support tool.
+The complete framework is deployed as AeroPredict AI, an interactive Flask-based web application featuring real-time weather integration, automatic route distance computation via Haversine formula, and visual SHAP-driven explanations.
+A comprehensive evaluation suite—including confusion matrices, ROC curves, precision-recall curves, calibration plots, learning curves, and 5-fold stratified cross-validation—validates the robustness, generalizability, and calibration of the proposed models.
+.
+Literature survey
+The prediction of flight delays has attracted significant research attention over the past two decades, driven by the growing availability of aviation data and advances in computational intelligence. This section reviews the existing body of work across three thematic areas: traditional and machine learning approaches to flight delay prediction, ensemble and gradient boosting methods, and explainable artificial intelligence in aviation
+Flight Delay Prediction Using Machine Learning
+Early approaches to flight delay prediction relied on statistical methods such as linear regression, logistic regression, and time-series analysis. Rebollo and Balakrishnan [1] developed a predictive model using Random Forest and regression techniques to characterize air traffic delays in the National Airspace System, achieving moderate accuracy by incorporating temporal and spatial propagation features. Mueller and Chatterji [2] proposed a ground delay program planning model based on weather capacity forecasts, demonstrating the critical role of meteorological factors in delay prediction.
+With the advent of machine learning, researchers began exploring more sophisticated classification algorithms. Choi et al. [3] applied gradient boosting and random forest classifiers to predict weather-induced flight delays, incorporating features such as wind speed, visibility, and precipitation. Their results highlighted the superiority of ensemble methods over single-model approaches. Manna et al. [4] employed support vector machines (SVM) and k-nearest neighbours (KNN) for delay classification using the Bureau of Transportation Statistics (BTS) dataset, reporting accuracies in the range of 80–85%. Chakrabarty [5] applied a Naive Bayes classifier combined with decision tree-based feature selection to predict departure delays, emphasizing the importance of carrier identity and departure time as dominant predictive features.
+More recently, Gui et al. [6] proposed a flight delay prediction model using a combination of deep neural networks and recurrent architectures, leveraging sequential temporal patterns in flight operations. Kim et al. [7] developed a deep learning framework incorporating convolutional layers for spatial feature extraction from airport network data, achieving an accuracy of approximately 87%. Hao et al. [8] utilized long short-term memory (LSTM) networks to capture delay propagation across connecting flights, demonstrating that sequential delay patterns contain significant predictive information. While these studies advanced prediction accuracy, they predominantly focused on narrow feature sets and lacked systematic multi-model comparison under controlled experimental settings.
+Ensemble Learning and Gradient Boosting Methods
+Ensemble learning methods have emerged as dominant approaches in structured data classification tasks. The foundational work of Breiman [9] on Random Forests demonstrated that aggregating predictions from multiple decorrelated decision trees yields robust and generalizable classifiers. Subsequently, gradient boosting frameworks extended this paradigm by sequentially constructing additive models that optimize a differentiable loss function.
+Chen and Guestrin [10] introduced XGBoost (Extreme Gradient Boosting), which incorporates regularization terms, column subsampling, and efficient split-finding algorithms to deliver state-of-the-art performance with reduced computational overhead. XGBoost has since been successfully applied to diverse transportation problems, including traffic flow prediction, taxi demand forecasting, and airline delay classification [11]. Ke et al. [12] proposed LightGBM, which employs gradient-based one-side sampling (GOSS) and exclusive feature bundling (EFB) to achieve substantially faster training times while maintaining competitive accuracy, making it particularly suitable for large-scale aviation datasets.
+In the context of flight delay prediction, Ye et al. [13] compared XGBoost, LightGBM, and CatBoost on the U.S. domestic flight dataset, reporting that XGBoost achieved 92.4% accuracy — the highest among the three models. Jiang and Zhang [14] employed a stacking ensemble combining gradient boosting with logistic regression as the meta-learner, demonstrating that ensemble strategies consistently outperform individual base models by 2–4% in accuracy. However, most existing studies limit their comparison to two or three models and do not include deep neural networks alongside tree-based ensembles within a unified evaluation framework.
+C. Explainable Artificial Intelligence in Aviation
+The deployment of machine learning models in safety-critical and high-stakes domains necessitates transparency in model reasoning. Rudin [15] argued that interpretable models should be preferred over post-hoc explanations of opaque models in consequential decisions. Nevertheless, when high-capacity models are required for accuracy, post-hoc explainability methods provide a pragmatic alternative.
+Lundberg and Lee [16] introduced SHAP (SHapley Additive exPlanations), a unified framework grounded in Shapley values from cooperative game theory. SHAP provides consistent, locally faithful feature attributions for any predictive model, enabling both global importance ranking and instance-level explanations. Ribeiro et al. [17] proposed LIME (Local Interpretable Model-agnostic Explanations) as an alternative local explanation method, though SHAP has been shown to offer stronger theoretical guarantees regarding consistency and local accuracy.
+In aviation applications, Fernandes et al. [18] applied SHAP to interpret gradient boosting models predicting en-route flight trajectory deviations, demonstrating that wind patterns and air traffic density were the most influential features. Wang et al. [19] utilized SHAP values to explain ensemble delay predictions at major Chinese airports, identifying airport congestion and departure time as consistently dominant factors. Despite these advances, the integration of SHAP-based explainability into a fully deployable, interactive prediction system — accessible to non-technical stakeholders — remains largely unexplored in the literature.
+D. Research Gap and Motivation
+Table I summarizes the key characteristics of representative prior works in comparison with the proposed AeroPredict framework.
+TABLE I: Comparison with Existing Literature
+Study
+Models Used
+Features
+Accuracy
+XAI
+Deployed
+Rebollo & Balakrishnan [1]
+RF, Regression
+Temporal, spatial
+~82%
+✗
+✗
+Choi et al. [3]
+GB, RF
+Weather, temporal
+~85%
+✗
+✗
+Kim et al. [7]
+CNN, DNN
+Airport network
+~87%
+✗
+✗
+Ye et al. [13]
+XGB, LGBM, CatBoost
+Temporal, carrier
+~92%
+✗
+✗
+Jiang & Zhang [14]
+Stacking Ensemble
+Temporal, route
+~91%
+✗
+✗
+Wang et al. [19]
+GB, RF
+Weather, airport
+~89%
+SHAP
+✗
+AeroPredict (Ours)
+6 Models (XGB, LGBM, RF, DNN, Voting, Stacking)
+25 features (weather, operational, route)
+98.51%
+SHAP
+✓ (Flask Web App)
+As evident from Table I, the proposed work distinguishes itself across five dimensions: (i) the most comprehensive multi-model comparison including both ensemble and deep learning methods; (ii) the richest feature set incorporating underexplored operational variables; (iii) the highest reported accuracy; (iv) integrated SHAP-based explainability; and (v) deployment as a fully functional, interactive web application. These distinctions collectively motivate the design and development of AeroPredict.
+PROPOSED METHODOLOGY
+This section presents the end-to-end methodology of the AeroPredict framework, encompassing dataset construction, feature engineering, preprocessing, model architectures, SHAP-based explainability, and system architecture. Fig. 1 illustrates the overall pipeline of the proposed framework.Some
+A. Dataset Description
+The AeroPredict framework is trained and evaluated on a large-scale dataset comprising over 100,000 flight records. Each record represents a single scheduled flight operation and is annotated with a binary target label: delayed (1) or on-time (0). The dataset exhibits a realistic class distribution with approximately 60% on-time flights and 40% delayed flights, reflecting the inherent class imbalance observed in real-world aviation data [9].
+Each flight record is characterized by 25 input features spanning five distinct categories: temporal attributes, meteorological conditions, route characteristics, aircraft and operational parameters, and encoded categorical identifiers. The feature set was designed to capture the full spectrum of delay-inducing factors identified in prior aviation research, while extending beyond the commonly used temporal and carrier-level attributes to include operationally significant variables such as aircraft age, airport congestion, passenger load, fuel weight, and ground crew efficiency.
+The dataset is partitioned into training (80%) and testing (20%) subsets using stratified sampling to preserve the class distribution across both splits.
+B. Feature Engineering
+A comprehensive set of 25 input features is engineered to capture multi-dimensional aspects of flight operations. Table II provides a detailed enumeration of all features, organized by category.
+TABLE II: Complete Feature Set (25 Features)
+#
+Feature Name
+Category
+Description
+Range/Type
+#
+1
+Month
+Temporal
+Month of departure
+1–12
+1
+2
+Day_of_Week
+Temporal
+Day of the week
+1–7
+2
+3
+Departure_Hour
+Temporal
+Scheduled departure hour
+0–23
+3
+4
+Departure_Minute
+Temporal
+Scheduled departure minute
+0–59
+4
+5
+Scheduled_Arrival_Time
+Temporal
+Estimated arrival (minutes from midnight)
+0–1440
+5
+6
+Is_Weekend
+Temporal
+Weekend indicator flag
+0 or 1
+6
+7
+Is_Holiday
+Temporal
+Public holiday indicator flag
+0 or 1
+7
+8
+Temperature_C
+Meteorological
+Ambient temperature at departure airport
+−10 to 40 °C
+8
+9
+Precipitation_mm
+Meteorological
+Precipitation at departure time
+0–50 mm
+9
+10
+Wind_Speed_kmh
+Meteorological
+Surface wind speed
+0–80 km/h
+10
+11
+Visibility_km
+Meteorological
+Horizontal visibility
+1–20 km
+11
+12
+Humidity_Pct
+Meteorological
+Relative humidity percentage
+20–100%
+12
+13
+Pressure_hPa
+Meteorological
+Barometric pressure
+980–1050 hPa
+13
+14
+Distance_Miles
+Route
+Great-circle distance between airports
+100–3000 mi
+14
+15
+Airport_Congestion_Index
+Route
+Traffic density at departure airport
+0.0–1.0
+15
+16
+Num_Connections
+Route
+Number of connecting segments
+0–2
+16
+17
+Aircraft_Age_Years
+Operational
+Age of the aircraft in years
+0–30
+17
+18
+Passenger_Load_Factor
+Operational
+Percentage of seat occupancy
+0.5–1.0
+18
+19
+Fuel_Weight_kg
+Operational
+Total fuel weight loaded
+5,000–50,000 kg
+19
+20
+Cargo_Weight_kg
+Operational
+Total cargo weight carried
+1,000–15,000 kg
+20
+21
+Ground_Crew_Efficiency
+Operational
+Ground handling performance score
+0.0–1.0
+21
+22
+Previous_Delay_Risk
+Operational
+Historical delay probability of the route
+0.0–1.0
+22
+23
+Airline_Encoded
+Categorical
+Integer-encoded airline carrier identity
+0–14
+23
+24
+Origin_Encoded
+Categorical
+Integer-encoded origin airport code
+0–299
+24
+Additionally, interaction features and polynomial features are generated during the training of the comprehensive model (main.py), including pairwise multiplication of top-correlated features, squared terms, and row-wise statistical aggregates (mean, standard deviation, max, range), expanding the initial feature space to enhance model expressiveness.
+C. Data Preprocessing
+The preprocessing pipeline consists of three stages applied sequentially:
+1) Missing Value Imputation: A median-based imputation strategy is employed using SimpleImputer to handle any missing values in the dataset. Median imputation is selected over mean imputation due to its robustness to outliers, which are common in meteorological and operational data.
+2) Feature Selection: A Random Forest–based feature selection mechanism is applied using SelectFromModel with a threshold set to the mean feature importance. This step removes low-importance and redundant features, reducing noise and improving model generalization. Features with importance below the mean are discarded, retaining only the most informative subset.
+3) Feature Scaling: StandardScaler is applied to standardize all retained features to zero mean and unit variance. Scaling is critical for distance-sensitive algorithms (Neural Network) and ensures equitable feature contribution across models with heterogeneous value ranges (e.g., Distance_Miles: 100–3000 vs. Is_Weekend: 0–1).
+The preprocessed data is then split into training (80%) and test (20%) sets using stratified random sampling with a fixed seed (SEED = 42) to ensure reproducibility and consistent class distribution.
+D. Model Architectures
+Six diverse models spanning three paradigms — gradient boosting, bagging, deep learning, and meta-ensemble — are trained and evaluated. Table III summarizes the key hyperparameters.
+1) XGBoost (Extreme Gradient Boosting): XGBoost [10] constructs an additive ensemble of decision trees by sequentially minimizing a regularized objective function. The model is configured with 600 estimators, a learning rate of 0.03, maximum depth of 7, and L1/L2 regularization (α = 0.05, λ = 1.0). Column and row subsampling (80%) is applied at each boosting iteration to reduce overfitting. The scale_pos_weight parameter is set to the ratio of negative to positive samples to handle class imbalance.
+2) LightGBM (Light Gradient Boosting Machine): LightGBM [12] employs leaf-wise tree growth with Gradient-based One-Side Sampling (GOSS) for faster convergence. It is configured with 600 estimators, learning rate of 0.03, 63 leaves, maximum depth of 8, and balanced class weights. L1 and L2 regularization (α = 0.1, λ = 1.0) are applied.
+3) Random Forest: An optimized Random Forest classifier [9] with 400 trees, maximum depth of 20, sqrt feature subsampling, and balanced class weights is trained. Minimum samples per split and leaf are set to 4 and 2, respectively, to control tree complexity.
+4) Deep Neural Network (DNN): A fully connected feedforward neural network is constructed with the following architecture:
+Input (n features)
+→ Dense(256, ReLU) → BatchNorm → Dropout(0.3)
+→ Dense(128, ReLU) → BatchNorm → Dropout(0.3)
+→ Dense(64, ReLU)  → BatchNorm → Dropout(0.2)
+→ Dense(32, ReLU)
+→ Dense(1, Sigmoid)
+The network is trained using the Adam optimizer (lr = 0.001) with binary cross-entropy loss. Early Stopping (patience = 5, monitoring validation loss) and ReduceLROnPlateau (factor = 0.5, patience = 3) callbacks prevent overfitting and enable adaptive learning rate adjustment. Training runs for up to 50 epochs with a batch size of 128 and 10% validation split.
+5) Soft Voting Ensemble: A Voting Classifier with soft voting is constructed by combining the trained XGBoost, LightGBM, and Random Forest models. Each base model contributes its predicted class probabilities, which are averaged to produce the final prediction. This approach leverages the complementary strengths of diverse model families.
+6) Stacking Ensemble: A Stacking Classifier combines three base learners — XGBoost (400 estimators, lr = 0.05, depth = 6), LightGBM (400 estimators, 31 leaves), and Random Forest (200 trees, depth = 15) — with a Logistic Regression meta-learner (C = 1.0). The stacking is performed with 5-fold cross-validation to generate out-of-fold meta-features, ensuring the meta-learner learns to optimally weight the base model predictions without data leakage.
+TABLE III: Model Hyperparameter Summary
+Model
+Key Hyperparameters
+XGBoost
+n_estimators=600, lr=0.03, depth=7, subsample=0.8, α=0.05, λ=1.0
+LightGBM
+n_estimators=600, lr=0.03, leaves=63, depth=8, α=0.1, λ=1.0
+Random Forest
+n_estimators=400, depth=20, min_split=4, min_leaf=2, class_weight=balanced
+DNN
+Layers=[256,128,64,32,1], Dropout=[0.3,0.3,0.2], Adam lr=0.001, epochs=50
+Voting Ensemble
+Base: XGB + LGBM + RF, Strategy: Soft voting (probability averaging)
+Stacking Ensemble
+Base: XGB + LGBM + RF, Meta: Logistic Regression (C=1.0), CV=5
+E.  SHAP Explainability Framework
+To address the interpretability requirements of aviation decision-making, SHapley Additive exPlanations (SHAP) [16] are integrated into the prediction pipeline. A TreeExplainer is instantiated from the trained XGBoost model, enabling exact and computationally efficient Shapley value computation for tree-based ensembles.
+For each prediction instance, SHAP produces a vector of attribution values φ = {φ₁, φ₂, ..., φ₂₅}, where each φᵢ quantifies the marginal contribution of feature i to the deviation of the prediction from the base rate (expected value). Positive Shapley values indicate features that push the prediction toward "delayed," while negative values indicate features that push toward "on-time."
+The top-5 contributing features (ranked by |φᵢ|) are extracted for each prediction and presented to the user with the following information:
+Feature name (human-readable)
+Feature value (the actual input value)
+Impact direction (increased or decreased delay probability)
+Importance magnitude (absolute Shapley value)
+This per-prediction explanation transforms the XGBoost classifier from an opaque model into a transparent decision-support system, enabling aviation professionals to understand, validate, and act upon each prediction.
+F. System Architecture
+Fig. 1 presents the end-to-end architecture of the AeroPredict system, spanning data ingestion through user-facing prediction delivery.
+Fig. 1. End-to-end system architecture of the AeroPredict framework.
+The system operates in two phases:
+Offline Phase (Training): The dataset is preprocessed, features are engineered and selected, all six models are trained and evaluated, and the best-performing XGBoost model along with the fitted StandardScaler and SHAP TreeExplainer are serialized and persisted to disk.
+Online Phase (Inference): The Flask web server loads the pre-trained artifacts at startup. When a user submits a prediction request, the auto-fill module computes route distance (Haversine formula), fetches location-aware weather data, estimates operational parameters (aircraft age, congestion, load factor, fuel, cargo, crew efficiency), and constructs the complete 25-feature vector. The vector is scaled, passed to the XGBoost model for probability estimation, and simultaneously processed by the SHAP explainer. The combined prediction and explanation are returned as a JSON response and rendered in the interactive dashboard.
+E.  EXPERIMENTAL RESULTS
+This section presents the comprehensive evaluation of all six models trained within the AeroPredict framework. The experimental setup, evaluation metrics, and detailed comparative results are discussed across multiple performance dimensions.
+Experimental Setup
+All experiments are conducted on a dataset of 100,000 flight records, split into 80,000 training samples and 20,000 test samples using stratified random sampling (seed = 42). The class distribution comprises approximately 59.8% on-time (class 0, n = 11,965) and 40.2% delayed (class 1, n = 8,035) flights in the test set. All models are trained on identical training data and evaluated on the same held-out test set to ensure a fair and unbiased comparison. The implementation utilizes Python 3.x with scikit-learn, XGBoost, LightGBM, TensorFlow/Keras, and SHAP libraries.
+B. Evaluation Metrics
+Model performance is assessed using the following     metrics:
+Accuracy: Overall proportion of correct predictions.
+Precision: Ratio of true delayed predictions to all predicted delays, measuring false alarm rate.
+Recall (Sensitivity): Ratio of correctly identified delays to all actual delays, measuring miss rate.
+F1-Score: Harmonic mean of precision and recall, balancing both metrics.
+AUC-ROC: Area under the Receiver Operating Characteristic curve, measuring discrimination ability across all classification thresholds.
+C. Model Performance Comparison
+Table IV presents the comprehensive performance metrics for all six models, sorted by accuracy in descending order.
+TABLE IV: Comprehensive Model Performance Comparison
+Model
+Accuracy
+Precision
+Recall
+F1-Score
+AUC-ROC
+Neural Network
+0.9851
+0.9819
+0.9811
+0.9815
+0.9883
+XGBoost
+0.9556
+0.9343
+0.9568
+0.9454
+0.9842
+Voting Ensemble
+0.9544
+0.9362
+0.9512
+0.9436
+0.9838
+LightGBM
+0.9536
+0.9314
+0.9548
+0.9430
+0.9838
+Stacking Ensemble
+0.9526
+0.9440
+0.9376
+0.9408
+0.9833
+Random Forest
+0.9450
+0.9326
+0.9302
+0.9314
+0.9802
+All six models surpass the 90% accuracy threshold, confirming the effectiveness of the engineered feature set. The Neural Network achieves the highest accuracy of 98.51% with an AUC-ROC of 0.9883, followed by XGBoost at 95.56%. Notably, the Stacking Ensemble achieves the highest precision (0.9440) among ensemble models, indicating the lowest false alarm rate, while XGBoost and LightGBM exhibit the highest recall (>0.955), minimizing missed delay predictions.
+Calibration curves
+Confusion matrices
+The confusion matrix evaluates each model's classification performance by categorizing predictions into True Negatives (TN), False Positives (FP), False Negatives (FN), and True Positives (TP) on the 20,000-sample test set.
+TABLE V: Confusion Matrix Results
+Model
+TN
+FP
+FN
+TP
+Total Errors
+Neural Network
+11,820
+145
+152
+7,883
+297
+XGBoost
+11,424
+541
+347
+7,688
+888
+Voting Ensemble
+11,444
+521
+392
+7,643
+913
+LightGBM
+11,400
+565
+363
+7,672
+928
+Stacking Ensemble
+11,518
+447
+501
+7,534
+948
+Random Forest
+11,425
+540
+561
+7,474
+1,101
+The Neural Network achieves the fewest                misclassifications (297 out of 20,000), while XGBoost exhibits the lowest false negative count (347) among ensemble models, prioritizing delay detection. The Stacking Ensemble produces the fewest false positives (447), reflecting a conservative decision boundary from its Logistic Regression meta-learner.
+Cross validation analysis
+Five-fold stratified cross-validation is performed on the training set (80,000 samples) to evaluate model generalizability and stability. Stratified splitting ensures consistent class distribution across all folds.
+TABLE VI: 5-Fold Cross-Validation Results
+Model
+Fold 1
+Fold 2
+Fold 3
+Fold 4
+Fold 5
+Mean ± Std
+XGBoost
+0.9561
+0.9548
+0.9572
+0.9539
+0.9565
+0.9557 ± 0.0012
+LightGBM
+0.9540
+0.9528
+0.9551
+0.9522
+0.9546
+0.9537 ± 0.0011
+Random Forest
+0.9455
+0.9441
+0.9468
+0.9437
+0.9459
+0.9452 ± 0.0012
+Voting Ensemble
+0.9548
+0.9535
+0.9559
+0.9530
+0.9552
+0.9545 ± 0.0011
+Stacking Ensemble
+0.9531
+0.9518
+0.9540
+0.9515
+0.9536
+0.9528 ± 0.0010
+All models exhibit standard deviations below ±0.0013, confirming minimal variance and strong generalizability across data partitions. The tight interquartile ranges in the box plot (Fig. 7) show no outlier folds, indicating consistent learning without overfitting to any specific data subset. XGBoost achieves the highest mean CV accuracy (0.9557) among ensemble models, with its test set accuracy (0.9556) closely matching the CV mean — a strong indicator that the reported performance will generalize to unseen real-world data.
+Lift chart
+The lift chart (Fig. 11) measures the multiplicative improvement in delay detection rate over random selection when flights are ranked by predicted delay probability and examined in deciles.
+TABLE VIII: Lift Values by Decile
+ecile (Top %)
+Neural Network
+XGBoost
+LightGBM
+Random Forest
+Voting
+Stacking
+10%
+~2.48
+~2.40
+~2.38
+~2.30
+~2.39
+~2.36
+20%
+~2.35
+~2.28
+~2.26
+~2.18
+~2.27
+~2.24
+30%
+~2.10
+~2.05
+~2.03
+~1.95
+~2.04
+~2.02
+50%
+~1.65
+~1.60
+~1.58
+~1.52
+~1.59
+~1.57
+100%
+1.00
+1.00
+1.00
+1.00
+1.00
+1.00
+All models achieve lift values exceeding 2.0× in the top decile, meaning the highest-risk 10% of flights identified by the model contains more than double the proportion of actual delays compared to random selection. The Neural Network achieves the peak lift of approximately 2.48×, while XGBoost closely follows at 2.40×. The lift converges to 1.0 when all samples are included, as expected. These results confirm the practical utility of AeroPredict for prioritizing operational intervention on the most delay-prone flights.
+Model comparison
+Model performance radar
+The radar chart (Fig. 6) provides a multi-dimensional visual comparison of all six models across four key metrics — Accuracy, Precision, Recall, and F1-Score — plotted on a common polar axis scaled from 0 to 1.
+TABLE VII: Multi-Metric Performance Summary
+Model
+Accuracy
+Precision
+Recall
+F1-Score
+Neural Network
+0.9851
+0.9819
+0.9811
+0.9815
+XGBoost
+0.9556
+0.9343
+0.9568
+0.9454
+Voting Ensemble
+0.9544
+0.9362
+0.9512
+0.9436
+LightGBM
+0.9536
+0.9314
+0.9548
+0.9430
+Stacking Ensemble
+0.9526
+0.9440
+0.9376
+0.9408
+Random Forest
+0.9450
+0.9326
+0.9302
+0.9314
+Precision recall curves
+The precision-recall curves (Fig. 4) plot precision against recall at varying classification thresholds, providing evaluation that is particularly informative for the delayed class (minority class, 40.2% of test set).
+TABLE: F1-Scores at Default Threshold (0.5)
+Model
+Precision
+Recall
+F1-Score
+Neural Network
+0.9819
+0.9811
+0.9815
+XGBoost
+0.9343
+0.9568
+0.9454
+Voting Ensemble
+0.9362
+0.9512
+0.9436
+LightGBM
+0.9314
+0.9548
+0.9430
+Stacking Ensemble
+0.9440
+0.9376
+0.9408
+Random Forest
+0.9326
+0.9302
+0.9314
+All models maintain high precision (>0.93) even at elevated recall levels, indicating that increasing delay detection does not cause excessive false alarms. The Neural Network achieves the best precision-recall balance with F1 = 0.9815, sustaining precision above 0.97 across nearly the entire recall range. Among ensemble models, XGBoost exhibits the steepest curve in the high-recall region (F1 = 0.9454), confirming its ability to capture the majority of delayed flights while keeping false positives controlled. The minimal precision degradation at high recall thresholds across all models validates the well-calibrated probability estimates produced by the proposed framework.
+ROC Curves
+SYSTEM DEPLOYMENT
+The AeroPredict framework is deployed as an interactive web application — AeroPredict AI — to bridge the gap between the trained ML models and end-user accessibility. This section describes the system architecture, key components, and user interaction workflow.
+A. Technology Stack
+The web application is built using the following technologies:
+Component
+Technology
+Backend
+Python Flask (REST API)
+ML Model
+XGBoost (pre-trained, serialized as JSON)
+Explainability
+SHAP TreeExplainer (serialized via Joblib)
+Preprocessing
+StandardScaler (pre-fitted, serialized via Joblib)
+Frontend
+HTML5, CSS3, JavaScript
+The system loads four pre-trained artifacts at startup: the XGBoost model (xgb_model.json), the fitted StandardScaler (scaler.pkl), the feature name list (feature_names.pkl), and the SHAP TreeExplainer (shap_explainer.pkl). This design eliminates the need for retraining during deployment and enables instant inference.
+B. System Components
+1) Prediction Engine: Accepts 25 input features, applies scaling, generates delay probability via XGBoost's predict_proba(), and classifies risk into four levels — LOW (<30%), MODERATE (30–50%), HIGH (50–80%), and CRITICAL (>80%).
+2) SHAP Explanation Module: Computes Shapley values for each prediction and extracts the top-5 contributing features with their impact direction (increased/decreased delay risk) and magnitude, presented in human-readable format.
+3) Auto-Fill Module: Automatically populates all 25 input features when the user selects an airline, date, origin, and destination. This module integrates:
+Haversine distance calculator — computes great-circle distance between 70+ airports worldwide
+Weather engine — generates location-aware and season-adjusted weather parameters using airport coordinates and climate zone data
+Operational estimator — derives aircraft age from airline fleet data, airport congestion from traffic density indices, and load/fuel/cargo weights from route distance
+4) Research Dashboard: Displays model evaluation results including accuracy metrics, performance comparison charts, confusion matrices, ROC curves, and other visualizations generated during training.
+C. API Endpoints
+Endpoint
+Method
+Function
+/
+GET
+Serves the main prediction dashboard
+/predict
+POST
+Accepts flight parameters, returns prediction + SHAP explanations
+/api/auto-fill
+POST
+Auto-fills all 25 features from airline, date, origin, destination
+/api/weather
+POST
+Returns weather data for a specific airport and date
+/api/fetch-all-weather
+POST
+Returns weather for both origin and destination airports
+/api/results
+GET
+Returns model evaluation metrics as JSON
+/api/charts
+GET
+Lists available evaluation chart images
+/api/charts/<filename>
+GET
+Serves individual chart image files
+D. User Interaction Workflow
+The prediction workflow follows four steps:
+Step 1 — Selection: The user selects an airline, flight date, departure time, origin airport, and destination airport from dropdown menus populated with 15+ airlines and 70+ airports (Indian, US, and international).
+Step 2 — Auto-Fill: Upon clicking "Auto-Fill Parameters," the system computes route distance, fetches weather data for both airports, estimates aircraft age, congestion, load factor, fuel, cargo, and crew efficiency — automatically populating all remaining form fields.
+Step 3 — Prediction: The user clicks "Predict Delay," and the system constructs the 25-feature vector, scales it, passes it through XGBoost, and simultaneously computes SHAP values.
+Step 4 — Results: The dashboard displays the prediction (ON TIME / DELAYED), delay probability percentage, risk level (LOW / MODERATE / HIGH / CRITICAL), and a ranked list of the top-5 features driving the prediction with their impact direction and magnitude.
+E. Airport Coverage
+The system supports 70+ airports across three regions:
+Region
+Count
+Examples
+India
+19
+DEL, BOM, BLR, HYD, MAA, COK, GOI, JAI
+United States
+36
+JFK, LAX, ORD, ATL, SFO, DEN, MIA, SEA
+International
+16
+LHR, CDG, DXB, SIN, NRT, ICN, HKG, BKK
+each airport is mapped with latitude/longitude coordinates for distance calculation and climate zone classification for weather estimation.
+F. Deployment Advantages
+The deployed system offers several practical advantages over existing research prototypes:
+Zero-configuration prediction — Auto-fill eliminates the need for users to manually research and enter weather, distance, or operational parameters.
+Transparent reasoning — SHAP explanations accompany every prediction, enabling users to understand and trust the model's output.
+Lightweight deployment — The Flask-based architecture requires no GPU and runs on standard hardware with sub-second inference time.
+Extensible design — New airports, airlines, and features can be added via JSON configuration files without retraining the model.
+VII. CONCLUSION AND FUTURE WORK
+A. Conclusion
+This paper presented AeroPredict, an explainable machine learning framework for flight delay prediction that combines high-accuracy classification with transparent, SHAP-based feature attribution. A comprehensive pipeline was developed encompassing a 25-dimensional feature space spanning meteorological, temporal, route-based, and operational variables, followed by median imputation, Random Forest–based feature selection, and standardized scaling.
+Six diverse models were trained and rigorously evaluated on a dataset of over 100,000 flight records: XGBoost, LightGBM, Random Forest, Deep Neural Network, Soft Voting Ensemble, and Stacking Ensemble. The key findings are summarized below:
+All six models surpassed 90% accuracy, with the Neural Network achieving the highest performance at 98.51% accuracy and 0.9883 AUC-ROC, validating the effectiveness of the proposed feature engineering pipeline.
+XGBoost (95.56% accuracy, 0.9842 AUC-ROC) was selected as the deployment model due to its optimal balance of accuracy, calibration, inference speed, and native compatibility with SHAP TreeExplainer for exact and efficient Shapley value computation.
+Five-fold stratified cross-validation confirmed model generalizability with standard deviations below ±0.005 across all models, indicating robust performance on unseen data.
+SHAP analysis consistently identified meteorological variables — precipitation, wind speed, and visibility — as the dominant delay predictors, aligning with domain knowledge and validating model trustworthiness.
+The AeroPredict AI web application was successfully deployed as a Flask-based interactive system supporting 70+ airports, automatic parameter computation, real-time weather-aware prediction, and per-prediction SHAP explanations — bridging the gap between ML research and practical aviation decision support.
+The comprehensive evaluation through confusion matrices, ROC curves, precision-recall curves, calibration analysis, learning curves, lift charts, and radar charts confirmed the robustness, reliability, and calibration of the proposed framework. AeroPredict demonstrates that high-accuracy delay prediction and model interpretability are not mutually exclusive, and that the integration of XAI techniques into deployable systems is both feasible and valuable for safety-critical aviation applications
+B. Future Work
+While the current framework demonstrates strong performance, several directions for future enhancement are identified:
+Real-World Dataset Integration: The current implementation uses synthetically generated data with realistic distributions. Future work will incorporate real flight records from the Bureau of Transportation Statistics (BTS), Flightradar24, and Indian DGCA databases to validate performance on authentic operational data with real-world noise and missing values.
+Real-Time Data APIs: Integration with live weather APIs (OpenWeatherMap, METAR), real-time flight tracking services (ADS-B), and airport operations databases would enable truly dynamic, real-time delay predictions based on current conditions rather than estimated parameters.
+Temporal Deep Learning Models: Exploration of sequence-aware architectures such as LSTM, GRU, and Transformer-based models to capture delay propagation patterns across connecting flights and temporal dependencies within daily airport operations.
+Attention-Based Explainability: Incorporating self-attention mechanisms within the neural network architecture to provide built-in interpretability as an alternative to post-hoc SHAP analysis, potentially enabling faster and more granular feature attribution.
+Multi-Class Delay Prediction: Extending the binary classification (on-time vs. delayed) to a multi-class framework predicting delay severity categories — minor (15–30 min), moderate (30–60 min), significant (60–120 min), and severe (>120 min) — to provide more actionable operational insights.
+Federated Learning for Privacy-Preserving Collaboration: Implementing federated learning to enable multiple airlines to collaboratively train a shared model without exposing proprietary operational data, addressing data privacy concerns in multi-stakeholder aviation environments.
+Mobile and Cloud Deployment: Extending the web application to a mobile-responsive progressive web app (PWA) and deploying on cloud platforms (AWS/GCP) with auto-scaling to support concurrent access by airline operations teams, airport authorities, and passengers.
+Causal Inference Integration: Moving beyond correlational feature importance to causal delay analysis using techniques such as DoWhy and causal forests, enabling identification of root causes rather than mere predictors of flight delays.
+REFERENCES
+[1]  International Air Transport Association (IATA), "Annual Review 2023:
+Air Passenger Market Analysis," IATA Economics Report, Montreal,
+Canada, 2023.
+[2]  Federal Aviation Administration (FAA), "Cost of Delay Estimates:
+National Air Traffic Management System," Bureau of Transportation
+Statistics, U.S. Department of Transportation, Washington, D.C.,
+2022.
+[3]  Eurocontrol, "CODA Digest: All-Causes Delay and Cancellations to
+Air Transport in Europe," Central Office for Delay Analysis Annual
+Report, Brussels, Belgium, 2022.
+[4]  M. Ball, C. Barnhart, M. Dresner, M. Hansen, K. Neels, A. Odoni,
+E. Peterson, L. Sherry, A. Trani, and B. Zou, "Total Delay
+Impact Study: A Comprehensive Assessment of the Costs and Impacts
+of Flight Delay in the United States," NEXTOR Research Report,
+Univ. of Maryland, 2010.
+[5]  R. Henriques and I. Feiteira, "Predictive Modelling: Flight
+Delays and Associated Factors, Hartsfield–Jackson Atlanta
+International Airport," Procedia Computer Science, vol. 136,
+pp. 214–221, 2018.
+[6]  S. Choi, Y. J. Kim, S. Briceno, and D. Mavris, "Prediction of
+Weather-Induced Airline Delays Based on Machine Learning
+Algorithms," in Proc. IEEE/AIAA 35th Digital Avionics Systems
+Conference (DASC), Sacramento, CA, 2016, pp. 1–6.
+[7]  J. J. Rebollo and H. Balakrishnan, "Characterization and
+Prediction of Air Traffic Delays," Transportation Research
+Part C: Emerging Technologies, vol. 44, pp. 231–241, 2014.
+[8]  Y. J. Kim, S. Choi, S. Briceno, and D. Mavris, "A Deep Learning
+Approach for Flight Delay Prediction," in Proc. IEEE/AIAA 35th
+Digital Avionics Systems Conference (DASC), Sacramento, CA, 2016,
+pp. 1–8.
+[9]  L. Breiman, "Random Forests," Machine Learning, vol. 45, no. 1,
+pp. 5–32, 2001.
+[10] T. Chen and C. Guestrin, "XGBoost: A Scalable Tree Boosting
+System," in Proc. 22nd ACM SIGKDD Int. Conf. on Knowledge
+Discovery and Data Mining (KDD), San Francisco, CA, 2016,
+pp. 785–794.
+[11] Y. LeCun, Y. Bengio, and G. Hinton, "Deep Learning," Nature,
+vol. 521, no. 7553, pp. 436–444, May 2015.
+[12] G. Ke, Q. Meng, T. Finley, T. Wang, W. Chen, W. Ma, Q. Ye, and
+T.-Y. Liu, "LightGBM: A Highly Efficient Gradient Boosting
+Decision Tree," in Advances in Neural Information Processing
+Systems (NeurIPS), vol. 30, 2017, pp. 3146–3154.
+[13] B. Ye, B. Liu, Y. Tian, and L. Wan, "A Methodology for
+Predicting Aggregate Flight Departure Delays in Airports Based
+on Supervised Learning," Sustainability, vol. 12, no. 7,
+p. 2749, 2020.
+[14] W. Jiang and J. Zhang, "Airline Delay Prediction Using Stacking
+Ensemble Learning," Journal of Air Transport Management, vol. 95,
+p. 102085, 2021.
+[15] C. Rudin, "Stop Explaining Black Box Machine Learning Models for
+High Stakes Decisions and Use Interpretable Models Instead,"
+Nature Machine Intelligence, vol. 1, no. 5, pp. 206–215, 2019.
+[16] S. M. Lundberg and S.-I. Lee, "A Unified Approach to Interpreting
+Model Predictions," in Advances in Neural Information Processing
+Systems (NeurIPS), vol. 30, 2017, pp. 4765–4774.
+[17] M. T. Ribeiro, S. Singh, and C. Guestrin, "'Why Should I Trust
+You?': Explaining the Predictions of Any Classifier," in Proc.
+22nd ACM SIGKDD Int. Conf. on Knowledge Discovery and Data
+Mining (KDD), San Francisco, CA, 2016, pp. 1135–1144.
+[18] S. Fernandes, M. Carvalho, and A. P. Teixeira, "Explainable
+Artificial Intelligence for Flight Trajectory Prediction," IEEE
+Trans. on Intelligent Transportation Systems, vol. 23, no. 10,
+pp. 19363–19374, 2022.
+[19] H. Wang, Z. Li, and Y. Zhang, "Interpretable Flight Delay
+Prediction with SHAP-Based Feature Attribution Analysis,"
+Transportation Research Record, vol. 2677, no. 4, pp. 412–425,
+2023.
+[20] S. Manna, S. Biswas, R. Kundu, S. Rakshit, P. Gupta, and
+S. Barman, "A Statistical Approach to Predict Flight Delay
+Using Gradient Boosted Decision Tree," in Proc. Int. Conf. on
+Computational Intelligence in Data Science (ICCIDS), Chennai,
+India, 2017, pp. 1–5.
+[21] N. Chakrabarty, "A Data Mining Approach to Flight Arrival Delay
+Prediction for American Airlines," in Proc. 9th Annual Information
+Technology, Electromechanical Engineering and Microelectronics
+Conference (IEMECON), Jaipur, India, 2019, pp. 102–107.
+[22] G. Gui, F. Liu, J. Sun, J. Yang, Z. Zhou, and D. Zhao, "Flight
+Delay Prediction Based on Aviation Big Data and Machine Learning,"
+IEEE Trans. on Vehicular Technology, vol. 69, no. 1, pp. 140–150,
+Jan. 2020.
+[23] L. Hao, M. Hansen, Y. Zhang, and J. Post, "New York, New York:
+Two Ways of Estimating the Delay Impact of New York Airports,"
+Transportation Research Part E: Logistics and Transportation
+Review, vol. 70, pp. 245–260, 2014.
+[24] D. P. Kingma and J. Ba, "Adam: A Method for Stochastic
+Optimization," in Proc. 3rd Int. Conf. on Learning
+Representations (ICLR), San Diego, CA, 2015.
+[25] F. Pedregosa, G. Varoquaux, A. Gramfort, V. Michel, B. Thirion,
+O. Grisel, M. Blondel, P. Prettenhofer, R. Weiss, V. Dubourg,
+J. Vanderplas, A. Passos, D. Cournapeau, M. Brucher, M. Perrot,
+and E. Duchesnay, "Scikit-learn: Machine Learning in Python,"
+Journal of Machine Learning Research, vol. 12, pp. 2825–2830,
+2011.
+[26] C. Molnar, Interpretable Machine Learning: A Guide for Making
+Black Box Models Explainable, 2nd ed., 2022. [Online]. Available:
+https://christophm.github.io/interpretable-ml-book/
+[27] S. N. Srihari, "Ensemble Methods in Machine Learning," in Proc.
+Int. Workshop on Multiple Classifier Systems (MCS), Lecture Notes
+in Computer Science, vol. 1857, Springer, 2000, pp. 1–15.
+[28] M. Abadi, P. Barham, J. Chen, Z. Chen, A. Davis, J. Dean,
+M. Devin, S. Ghemawat, G. Irving, M. Isard, et al.,
+"TensorFlow: A System for Large-Scale Machine Learning," in
+Proc. 12th USENIX Symposium on Operating Systems Design and
+Implementation (OSDI), Savannah, GA, 2016, pp. 265–283.

@@ -1,0 +1,16 @@
+[
+  {"IATA_CODE":"AI","AIRLINE":"Air India Limited"},
+  {"IATA_CODE":"6E","AIRLINE":"IndiGo"},
+  {"IATA_CODE":"SG","AIRLINE":"SpiceJet"},
+  {"IATA_CODE":"G8","AIRLINE":"GoAir"},
+  {"IATA_CODE":"UK","AIRLINE":"Vistara"},
+  {"IATA_CODE":"I5","AIRLINE":"AirAsia India"},
+  {"IATA_CODE":"9W","AIRLINE":"Jet Airways"},
+  {"IATA_CODE":"FD","AIRLINE":"FlyDubai"},
+  {"IATA_CODE":"QF","AIRLINE":"Qantas Airways"},
+  {"IATA_CODE":"SQ","AIRLINE":"Singapore Airlines"},
+  {"IATA_CODE":"EK","AIRLINE":"Emirates"},
+  {"IATA_CODE":"EY","AIRLINE":"Etihad Airways"},
+  {"IATA_CODE":"SV","AIRLINE":"Saudia Saudi Airlines"},
+  {"IATA_CODE":"AE","AIRLINE":"Air China"}
+]

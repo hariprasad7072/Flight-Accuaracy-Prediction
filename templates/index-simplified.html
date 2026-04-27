@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AeroPredict AI - Flight Delay Prediction</title>
+    <meta name="description" content="Advanced AI system for predicting flight delays using XGBoost and SHAP explainability.">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style-simplified.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="header-content">
+            <div class="logo">
+                <i class="fas fa-plane"></i>
+                AeroPredict AI
+            </div>
+            <nav class="nav-links">
+                <li><a href="#predictor">Predict</a></li>
+                <li><a href="#models">Models</a></li>
+                <li><a href="#about">About</a></li>
+            </nav>
+            <div class="status">
+                <span class="status-dot"></span>
+                System Online
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1>Flight Delay Prediction</h1>
+            <p>Predict flight delays with 95%+ accuracy using AI-powered analysis and explainable predictions</p>
+        </div>
+    </section>
+
+    <!-- Stats -->
+    <section class="stats">
+        <div class="stat-card">
+            <div class="stat-number">95.56%</div>
+            <div class="stat-label">XGBoost Accuracy</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">98.51%</div>
+            <div class="stat-label">Best Model</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">6</div>
+            <div class="stat-label">Models Compared</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">100K+</div>
+            <div class="stat-label">Training Samples</div>
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <div class="container">
+        <!-- Prediction Form & Result -->
+        <div class="grid-2" id="predictor">
+            <!-- Left: Form -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-sliders-h"></i>
+                    <h2>Flight Parameters</h2>
+                </div>
+                <form id="predictionForm">
+                    <!-- Flight Information -->
+                    <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1rem; color: var(--text-secondary);">Flight Info</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Airline</label>
+                            <select name="airline" id="airline-select">
+                                {% for airline in airlines %}
+                                <option value="{{ airline.IATA_CODE }}">{{ airline.IATA_CODE }} - {{ airline.AIRLINE }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Flight Date</label>
+                            <input type="date" name="date" value="2026-04-15" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Origin Airport</label>
+                            <select name="origin" id="origin-select">
+                                {% for airport in airports %}
+                                <option value="{{ airport.IATA_CODE }}" {% if airport.IATA_CODE == 'DEL' %}selected{% endif %}>{{ airport.IATA_CODE }} - {{ airport.AIRPORT[:30] }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Destination Airport</label>
+                            <select name="dest" id="dest-select">
+                                {% for airport in airports %}
+                                <option value="{{ airport.IATA_CODE }}" {% if airport.IATA_CODE == 'BOM' %}selected{% endif %}>{{ airport.IATA_CODE }} - {{ airport.AIRPORT[:30] }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row full">
+                        <div class="form-group">
+                            <label>Departure Time</label>
+                            <input type="time" name="time" value="14:30" required>
+                        </div>
+                    </div>
+
+
+                    <!-- Auto-Fill Status Banner -->
+                    <div id="autoFillBanner" class="auto-fill-banner" style="display: none;">
+                        <div class="auto-fill-header">
+                            <i class="fas fa-magic"></i>
+                            <span id="autoFillStatus">Fetching flight data...</span>
+                        </div>
+                    </div>
+
+                    <!-- Weather Comparison Cards -->
+                    <div id="weatherComparison" style="display: none; margin-top: 0.5rem; margin-bottom: 1.5rem;">
+                        <h3 style="margin-top: 0; margin-bottom: 0.75rem; font-size: 1rem; color: var(--text-secondary);">
+                            <i class="fas fa-cloud-sun" style="color: #667eea; margin-right: 0.3rem;"></i> Weather Conditions
+                        </h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                            <!-- Origin Weather -->
+                            <div class="weather-card" id="originWeatherCard">
+                                <div class="weather-card-header">
+                                    <i class="fas fa-plane-departure"></i>
+                                    <span id="originWeatherLabel">Origin</span>
+                                </div>
+                                <div class="weather-card-body">
+                                    <div class="weather-item"><i class="fas fa-thermometer-half"></i> <span id="originTemp">--</span>°C</div>
+                                    <div class="weather-item"><i class="fas fa-wind"></i> <span id="originWind">--</span> km/h</div>
+                                    <div class="weather-item"><i class="fas fa-cloud-rain"></i> <span id="originPrecip">--</span> mm</div>
+                                    <div class="weather-item"><i class="fas fa-eye"></i> <span id="originVis">--</span> km</div>
+                                    <div class="weather-item"><i class="fas fa-tint"></i> <span id="originHum">--</span>%</div>
+                                </div>
+                            </div>
+                            <!-- Destination Weather -->
+                            <div class="weather-card" id="destWeatherCard">
+                                <div class="weather-card-header">
+                                    <i class="fas fa-plane-arrival"></i>
+                                    <span id="destWeatherLabel">Destination</span>
+                                </div>
+                                <div class="weather-card-body">
+                                    <div class="weather-item"><i class="fas fa-thermometer-half"></i> <span id="destTemp">--</span>°C</div>
+                                    <div class="weather-item"><i class="fas fa-wind"></i> <span id="destWind">--</span> km/h</div>
+                                    <div class="weather-item"><i class="fas fa-cloud-rain"></i> <span id="destPrecip">--</span> mm</div>
+                                    <div class="weather-item"><i class="fas fa-eye"></i> <span id="destVis">--</span> km</div>
+                                    <div class="weather-item"><i class="fas fa-tint"></i> <span id="destHum">--</span>%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Route Info Banner -->
+                    <div id="routeInfoBanner" style="display: none; margin-bottom: 1rem; padding: 0.75rem 1rem; background: linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.10)); border: 1px solid rgba(102,126,234,0.25); border-radius: 0.5rem;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 0.75rem; flex-wrap: wrap;">
+                            <span id="routeOriginCity" style="font-weight: 600; color: #667eea;"></span>
+                            <i class="fas fa-long-arrow-alt-right" style="color: var(--text-muted);"></i>
+                            <span id="routeDestCity" style="font-weight: 600; color: #764ba2;"></span>
+                            <span style="color: var(--text-muted);">•</span>
+                            <span id="routeDistance" style="color: var(--text-secondary); font-weight: 500;"></span>
+                        </div>
+                    </div>
+
+                    <!-- Hidden Weather Fields (auto-filled) -->
+                    <input type="hidden" name="temp" id="temp-hidden" value="22">
+                    <input type="hidden" name="wind" id="wind-hidden" value="15">
+                    <input type="hidden" name="precip" id="precip-hidden" value="0">
+                    <input type="hidden" name="vis" id="vis-hidden" value="10">
+                    <input type="hidden" name="hum" id="hum-hidden" value="50">
+                    <input type="hidden" name="pres" id="pres-hidden" value="1013">
+
+                    <!-- Operations (auto-filled, shown as info cards) -->
+                    <h3 style="margin-top: 0.5rem; margin-bottom: 1rem; font-size: 1rem; color: var(--text-secondary);">
+                        <i class="fas fa-cogs" style="color: #667eea; margin-right: 0.3rem;"></i> Operations & Aircraft
+                    </h3>
+                    <div class="ops-grid" id="opsGrid">
+                        <div class="ops-item">
+                            <div class="ops-label"><i class="fas fa-ruler-horizontal"></i> Distance</div>
+                            <div class="ops-value" id="opsDistance">1200 mi</div>
+                            <input type="hidden" name="distance" value="1200">
+                        </div>
+                        <div class="ops-item">
+                            <div class="ops-label"><i class="fas fa-plane"></i> Aircraft Age</div>
+                            <div class="ops-value" id="opsAge">8 yrs</div>
+                            <input type="hidden" name="age" value="8">
+                        </div>
+                        <div class="ops-item">
+                            <div class="ops-label"><i class="fas fa-exchange-alt"></i> Connections</div>
+                            <div class="ops-value" id="opsConns">Direct</div>
+                            <input type="hidden" name="conns" value="0">
+                        </div>
+                        <div class="ops-item">
+                            <div class="ops-label"><i class="fas fa-traffic-light"></i> Congestion</div>
+                            <div class="ops-value" id="opsCongestion">50%</div>
+                            <input type="hidden" name="congestion" value="0.5">
+                        </div>
+                        <div class="ops-item">
+                            <div class="ops-label"><i class="fas fa-users"></i> Passenger Load</div>
+                            <div class="ops-value" id="opsLoad">80%</div>
+                            <input type="hidden" name="load" value="0.8">
+                        </div>
+                        <div class="ops-item">
+                            <div class="ops-label"><i class="fas fa-gas-pump"></i> Fuel</div>
+                            <div class="ops-value" id="opsFuel">20,000 kg</div>
+                            <input type="hidden" name="fuel" value="20000">
+                        </div>
+                        <div class="ops-item">
+                            <div class="ops-label"><i class="fas fa-box"></i> Cargo</div>
+                            <div class="ops-value" id="opsCargo">5,000 kg</div>
+                            <input type="hidden" name="cargo" value="5000">
+                        </div>
+                        <div class="ops-item">
+                            <div class="ops-label"><i class="fas fa-hard-hat"></i> Ground Crew</div>
+                            <div class="ops-value" id="opsEfficiency">90%</div>
+                            <input type="hidden" name="efficiency" value="0.9">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="predictBtn" style="margin-top: 1.5rem;">
+                        <i class="fas fa-running"></i> Predict Delay
+                    </button>
+                </form>
+            </div>
+
+            <!-- Right: Results -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-chart-line"></i>
+                    <h2>Prediction Result</h2>
+                </div>
+
+                <!-- Loading -->
+                <div id="loading" class="hidden">
+                    <div style="text-align: center; padding: 3rem 1rem;">
+                        <div class="spinner"></div>
+                        <div class="loading-text">Analyzing flight parameters...</div>
+                    </div>
+                </div>
+
+                <!-- Result Display -->
+                <div id="resultDisplay" class="hidden">
+                    <div class="result-container">
+                        <!-- Probability Display -->
+                        <div class="probability-display">
+                            <div class="probability-percent" id="probability">0%</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Prediction Badge -->
+                        <div id="predictionBadge" class="prediction-badge">ON TIME</div>
+
+                        <!-- Risk Level -->
+                        <h3 style="margin-top: 1.5rem; margin-bottom: 0.75rem; font-size: 0.95rem;">Risk Assessment</h3>
+                        <div class="risk-levels">
+                            <div class="risk-level" id="risk-low">
+                                <div class="risk-level-label">LOW</div>
+                                <div class="risk-level-value" style="font-size: 0.9rem;">0-25%</div>
+                            </div>
+                            <div class="risk-level" id="risk-moderate">
+                                <div class="risk-level-label">MODERATE</div>
+                                <div class="risk-level-value" style="font-size: 0.9rem;">25-50%</div>
+                            </div>
+                            <div class="risk-level" id="risk-high">
+                                <div class="risk-level-label">HIGH</div>
+                                <div class="risk-level-value" style="font-size: 0.9rem;">50-80%</div>
+                            </div>
+                            <div class="risk-level" id="risk-critical">
+                                <div class="risk-level-label">CRITICAL</div>
+                                <div class="risk-level-value" style="font-size: 0.9rem;">80%+</div>
+                            </div>
+                        </div>
+
+                        <!-- SHAP Explanations -->
+                        <h3 style="margin-top: 1.5rem; margin-bottom: 1rem; font-size: 0.95rem;">Why This Prediction?</h3>
+                        <div class="explanation-list" id="explanationList"></div>
+                    </div>
+                </div>
+
+                <!-- Default Message -->
+                <div id="defaultMessage" style="text-align: center; padding: 2rem 1rem; color: var(--text-muted);">
+                    <i class="fas fa-arrow-left" style="font-size: 2rem; color: var(--text-secondary); margin-bottom: 1rem; display: block;"></i>
+                    <p>Configure flight parameters and click <strong>"Predict Delay"</strong> to see the results.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Models Section -->
+        <section id="models" style="margin-top: 4rem;">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-robot"></i>
+                    <h2>Model Performance</h2>
+                </div>
+                <div class="models-grid" id="modelsGrid"></div>
+                <h3 style="margin-top: 2rem; margin-bottom: 1rem; font-size: 0.95rem;">Detailed Metrics</h3>
+                <div class="table-container">
+                    <table id="metricsTable">
+                        <thead>
+                            <tr>
+                                <th>Model</th>
+                                <th>Accuracy</th>
+                                <th>Precision</th>
+                                <th>Recall</th>
+                                <th>F1-Score</th>
+                                <th>AUC-ROC</th>
+                            </tr>
+                        </thead>
+                        <tbody id="metricsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- About Section -->
+        <section id="about" style="margin-top: 4rem;">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-info-circle"></i>
+                    <h2>About This System</h2>
+                </div>
+                <div style="line-height: 1.8; color: var(--text-secondary);">
+                    <p><strong>AeroPredict AI</strong> uses machine learning to predict flight delays with high accuracy. Our system analyzes 25 features including weather conditions, flight parameters, and operational metrics.</p>
+                    <p style="margin-top: 1rem;"><strong>Machine Learning Models:</strong> We train 6 different models (XGBoost, LightGBM, Random Forest, Neural Network, Voting Ensemble, Stacking Classifier) and use the best performer for predictions.</p>
+                    <p style="margin-top: 1rem;"><strong>Explainability:</strong> Every prediction includes SHAP (Shapley Additive Explanations) values, showing exactly which factors influenced the result.</p>
+                    <p style="margin-top: 1rem;"><strong>Accuracy:</strong> Our best model achieves 98.51% accuracy on test data, with comprehensive evaluation across multiple metrics.</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3>AeroPredict AI</h3>
+                <p style="color: var(--text-muted); margin-bottom: 1rem;">Advanced flight delay prediction powered by machine learning and explainable AI.</p>
+            </div>
+            <div class="footer-section">
+                <h3>Models</h3>
+                <ul>
+                    <li>XGBoost Classifier</li>
+                    <li>LightGBM</li>
+                    <li>Random Forest</li>
+                    <li>Deep Neural Network</li>
+                    <li>Ensemble Methods</li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h3>Technologies</h3>
+                <ul>
+                    <li>Python & Scikit-learn</li>
+                    <li>XGBoost & LightGBM</li>
+                    <li>TensorFlow/Keras</li>
+                    <li>SHAP Explainability</li>
+                    <li>Flask API</li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h3>Dataset</h3>
+                <ul>
+                    <li>100K+ Training Samples</li>
+                    <li>25 Input Features</li>
+                    <li>Global Weather Data</li>
+                    <li>Airport & Airline Info</li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-divider">
+            <div class="footer-bottom">
+                <p>&copy; 2026 AeroPredict AI. Advanced Flight Delay Prediction System.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script>
+        // ─── Auto-Fill Logic ─────────────────────────────────────────
+        let autoFillTimeout = null;
+        const TRIGGER_FIELDS = ['airline-select', 'origin-select', 'dest-select'];
+        const TRIGGER_INPUTS = ['date', 'time'];
+
+        function triggerAutoFill() {
+            // Debounce: wait 400ms after last change before firing
+            clearTimeout(autoFillTimeout);
+            autoFillTimeout = setTimeout(fetchAutoFill, 400);
+        }
+
+        // Watch select fields
+        TRIGGER_FIELDS.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('change', triggerAutoFill);
+        });
+
+        // Watch date and time inputs
+        TRIGGER_INPUTS.forEach(name => {
+            const el = document.querySelector(`input[name="${name}"]`);
+            if (el) el.addEventListener('change', triggerAutoFill);
+        });
+
+        async function fetchAutoFill() {
+            const airline = document.getElementById('airline-select').value;
+            const origin = document.getElementById('origin-select').value;
+            const dest = document.getElementById('dest-select').value;
+            const date = document.querySelector('input[name="date"]').value;
+            const time = document.querySelector('input[name="time"]').value;
+
+            if (!origin || !dest || !date) return;
+            if (origin === dest) {
+                showAutoFillStatus('⚠️ Origin and destination must be different', 'warning');
+                return;
+            }
+
+            showAutoFillStatus('Fetching flight data...', 'loading');
+
+            try {
+                const res = await fetch('/api/auto-fill', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ origin, dest, date, airline, time })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    applyAutoFill(data);
+                    showAutoFillStatus('✓ All parameters auto-configured', 'success');
+                } else {
+                    showAutoFillStatus('⚠️ ' + (data.error || 'Failed to fetch data'), 'warning');
+                }
+            } catch (err) {
+                showAutoFillStatus('✗ Network error: ' + err.message, 'error');
+            }
+        }
+
+        function showAutoFillStatus(message, type) {
+            const banner = document.getElementById('autoFillBanner');
+            const status = document.getElementById('autoFillStatus');
+            
+            banner.style.display = 'block';
+            status.textContent = message;
+            
+            banner.className = 'auto-fill-banner ' + type;
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    banner.style.opacity = '0';
+                    setTimeout(() => { banner.style.display = 'none'; banner.style.opacity = '1'; }, 500);
+                }, 3000);
+            }
+        }
+
+        function applyAutoFill(data) {
+            const p = data.params;
+            const wd = data.weather_details;
+            const ri = data.route_info;
+
+            // ── Update hidden form fields ──
+            setHiddenInput('temp', p.temp);
+            setHiddenInput('wind', p.wind);
+            setHiddenInput('precip', p.precip);
+            setHiddenInput('vis', p.vis);
+            setHiddenInput('hum', p.hum);
+            setHiddenInput('pres', p.pres);
+            setHiddenInput('distance', p.distance);
+            setHiddenInput('age', p.age);
+            setHiddenInput('conns', p.conns);
+            setHiddenInput('congestion', p.congestion);
+            setHiddenInput('load', p.load);
+            setHiddenInput('fuel', p.fuel);
+            setHiddenInput('cargo', p.cargo);
+            setHiddenInput('efficiency', p.efficiency);
+
+            // ── Update Operations display cards ──
+            animateValue('opsDistance', `${p.distance.toLocaleString()} mi`);
+            animateValue('opsAge', `${p.age} yrs`);
+            animateValue('opsConns', p.conns === 0 ? 'Direct' : `${p.conns} Stop${p.conns > 1 ? 's' : ''}`);
+            animateValue('opsCongestion', `${Math.round(p.congestion * 100)}%`);
+            animateValue('opsLoad', `${Math.round(p.load * 100)}%`);
+            animateValue('opsFuel', `${p.fuel.toLocaleString()} kg`);
+            animateValue('opsCargo', `${p.cargo.toLocaleString()} kg`);
+            animateValue('opsEfficiency', `${Math.round(p.efficiency * 100)}%`);
+
+            // ── Update Weather Comparison ──
+            if (wd) {
+                const wc = document.getElementById('weatherComparison');
+                wc.style.display = 'block';
+
+                // Origin
+                document.getElementById('originWeatherLabel').textContent = wd.origin.location || wd.origin.code;
+                document.getElementById('originTemp').textContent = wd.origin.temp;
+                document.getElementById('originWind').textContent = wd.origin.wind;
+                document.getElementById('originPrecip').textContent = wd.origin.precip;
+                document.getElementById('originVis').textContent = wd.origin.vis;
+                document.getElementById('originHum').textContent = wd.origin.hum;
+
+                // Destination
+                document.getElementById('destWeatherLabel').textContent = wd.dest.location || wd.dest.code;
+                document.getElementById('destTemp').textContent = wd.dest.temp;
+                document.getElementById('destWind').textContent = wd.dest.wind;
+                document.getElementById('destPrecip').textContent = wd.dest.precip;
+                document.getElementById('destVis').textContent = wd.dest.vis;
+                document.getElementById('destHum').textContent = wd.dest.hum;
+
+                // Animate weather cards
+                document.getElementById('originWeatherCard').classList.add('flash');
+                document.getElementById('destWeatherCard').classList.add('flash');
+                setTimeout(() => {
+                    document.getElementById('originWeatherCard').classList.remove('flash');
+                    document.getElementById('destWeatherCard').classList.remove('flash');
+                }, 800);
+            }
+
+            // ── Update Route Info ──
+            if (ri) {
+                const rb = document.getElementById('routeInfoBanner');
+                rb.style.display = 'block';
+                document.getElementById('routeOriginCity').textContent = ri.origin_city;
+                document.getElementById('routeDestCity').textContent = ri.dest_city;
+                document.getElementById('routeDistance').textContent = `${ri.distance_miles.toLocaleString()} miles`;
+            }
+        }
+
+        function setHiddenInput(name, value) {
+            const el = document.querySelector(`input[name="${name}"]`);
+            if (el) el.value = value;
+        }
+
+        function animateValue(elementId, newValue) {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            el.style.transform = 'scale(1.15)';
+            el.style.color = '#667eea';
+            setTimeout(() => {
+                el.textContent = newValue;
+                el.style.transform = 'scale(1)';
+                setTimeout(() => { el.style.color = ''; }, 300);
+            }, 150);
+        }
+
+        // ─── Form Submission ────────────────────────────────────────
+        document.getElementById('predictionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('resultDisplay');
+            const defaultMsg = document.getElementById('defaultMessage');
+            
+            loading.classList.remove('hidden');
+            result.classList.add('hidden');
+            defaultMsg.classList.add('hidden');
+            
+            try {
+                const formData = new FormData(e.target);
+                const response = await fetch('/predict', { method: 'POST', body: formData });
+                const data = await response.json();
+                
+                loading.classList.add('hidden');
+                
+                if (data.success) {
+                    displayResult(data);
+                    result.classList.remove('hidden');
+                    savePrediction(data);
+                } else {
+                    alert('Error: ' + data.error);
+                    defaultMsg.classList.remove('hidden');
+                }
+            } catch (err) {
+                loading.classList.add('hidden');
+                defaultMsg.classList.remove('hidden');
+                alert('Network error: ' + err.message);
+            }
+        });
+
+        function displayResult(data) {
+            const prob = data.probability * 100;
+            
+            // Update probability
+            document.getElementById('probability').textContent = prob.toFixed(1) + '%';
+            document.getElementById('progressFill').style.width = prob + '%';
+            
+            // Update prediction badge
+            const badge = document.getElementById('predictionBadge');
+            badge.textContent = data.prediction;
+            badge.classList.toggle('delayed', data.prediction === 'DELAYED');
+            
+            // Update risk levels
+            document.querySelectorAll('.risk-level').forEach(el => el.classList.remove('active'));
+            if (prob < 25) document.getElementById('risk-low').classList.add('active');
+            else if (prob < 50) document.getElementById('risk-moderate').classList.add('active');
+            else if (prob < 80) document.getElementById('risk-high').classList.add('active');
+            else document.getElementById('risk-critical').classList.add('active');
+            
+            // Display explanations
+            const expList = document.getElementById('explanationList');
+            expList.innerHTML = '';
+            data.explanations.forEach((exp, idx) => {
+                const div = document.createElement('div');
+                div.className = `explanation-item ${exp.impact === 'increased' ? 'increased' : 'decreased'}`;
+                div.innerHTML = `
+                    <div class="explanation-info">
+                        <div class="explanation-feature">${idx + 1}. ${exp.feature}</div>
+                        <div class="explanation-impact">${exp.impact === 'increased' ? '↑ Increases Risk' : '↓ Decreases Risk'} • Value: ${exp.value}</div>
+                    </div>
+                    <div class="explanation-importance">
+                        <div class="importance-value">${exp.importance.toFixed(3)}</div>
+                        <div class="importance-label">Impact</div>
+                    </div>
+                `;
+                expList.appendChild(div);
+            });
+        }
+
+        // ─── Load Models ────────────────────────────────────────────
+        async function loadModels() {
+            try {
+                const res = await fetch('/api/results');
+                const data = await res.json();
+                
+                const grid = document.getElementById('modelsGrid');
+                const tbody = document.getElementById('metricsBody');
+                grid.innerHTML = '';
+                tbody.innerHTML = '';
+                
+                const best = Math.max(...data.results.map(r => r.Accuracy));
+                
+                data.results.forEach(model => {
+                    const card = document.createElement('div');
+                    card.className = `model-card ${model.Accuracy === best ? 'best' : ''}`;
+                    card.innerHTML = `
+                        <div class="model-name">${model.Model}</div>
+                        <div class="model-accuracy">${(model.Accuracy * 100).toFixed(1)}%</div>
+                        <div class="model-metrics">
+                            <div>P: ${(model.Precision * 100).toFixed(0)}%</div>
+                            <div>R: ${(model.Recall * 100).toFixed(0)}%</div>
+                            <div>F1: ${(model['F1-Score'] * 100).toFixed(0)}%</div>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                    
+                    const row = tbody.insertRow();
+                    row.innerHTML = `
+                        <td>${model.Model}</td>
+                        <td>${(model.Accuracy * 100).toFixed(2)}%</td>
+                        <td>${(model.Precision * 100).toFixed(2)}%</td>
+                        <td>${(model.Recall * 100).toFixed(2)}%</td>
+                        <td>${(model['F1-Score'] * 100).toFixed(2)}%</td>
+                        <td>${(model['AUC-ROC'] * 100).toFixed(2)}%</td>
+                    `;
+                });
+            } catch (err) {
+                console.error('Error loading models:', err);
+            }
+        }
+
+        function savePrediction(data) {
+            let history = JSON.parse(localStorage.getItem('predictions') || '[]');
+            history.unshift({
+                date: new Date().toLocaleString(),
+                prediction: data.prediction,
+                probability: data.probability
+            });
+            history = history.slice(0, 10);
+            localStorage.setItem('predictions', JSON.stringify(history));
+        }
+
+        // ─── Initialize ────────────────────────────────────────────
+        document.addEventListener('DOMContentLoaded', () => {
+            loadModels();
+            // Auto-fill on page load with default selections
+            fetchAutoFill();
+        });
+    </script>
+</body>
+</html>
